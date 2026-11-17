@@ -59,6 +59,8 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
     {"MELODY", "[K3]SHAPE[OCT+]MAKE MELODY"},
     {"DICE", "[K1-4]ROLL[OCT+]ROLL ALL"},
     {"STRETCH", "[K2]STRETCH[OCT+]APPLY"},
+    {"LIVE", "[K1]MUTES[K2]REPEAT[OCT+]DROP"},
+    {"NEXT", "[K1]PHRASE 1-3[OCT+]KEEP"},
 };
 #define H_HOME "[PRESETS]SOUND[HOME]HOLD: MENU"
 #define H_LEVELS "[K1-4]T1-T4 LEVEL[HOME]MIXER"

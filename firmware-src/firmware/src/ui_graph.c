@@ -2341,6 +2341,8 @@ static void draw_graph(void)
         case GR_DFD_MELODY:
         case GR_DFD_DICE:
         case GR_DFD_STRETCH:
+        case GR_DFD_LIVE:
+        case GR_DFD_NEXT:
             cv_oy = 0;
             dfd_graph(pg->graph);
             break;

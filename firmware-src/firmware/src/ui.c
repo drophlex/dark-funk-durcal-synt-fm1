@@ -1846,7 +1846,7 @@ static int act_ready(void)
     if (!c--)
         return 0;
     if (cur_page()->graph == GR_EVENTS) return ev_act_ready();
-    if (dfd_page(cur_page()->graph)) return !chain_busy();
+    if (dfd_page(cur_page()->graph)) return !chain_busy() || cur_page()->graph == GR_DFD_LIVE;
     if (cur_page()->graph == GR_TOOLS)                  /* one case per column: CLEAR PAT, INIT, DELETE ROW, CLEAR SONG */
         return !chain_busy() && (c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u ? 1 :
                                  c == 2u ? ui.song_row < chain_config.count : chain_config.count != 0u);

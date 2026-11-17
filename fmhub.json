@@ -1,7 +1,9 @@
 {
-  "what": "A dark, easy groovebox for acid lines and chopped breaks. RITUAL blends two of 11 styles into a full 4-track song with one button; MELODY writes tunes that are always in key; DICE re-rolls one part at a time; easy time-stretch, a three-head tape echo and an eye that reacts to the music.",
+  "what": "A dark, easy groovebox for acid lines, chopped breaks and warped funk. RITUAL blends two of 15 styles into a full 4-track song with one button; LIVE plays it live (mutes, stutter, build and drop); NEXT suggests three continuations of your phrase; MELODY writes tunes that are always in key; DICE, time-stretch, a three-head tape echo and an eye that reacts to the music.",
   "author": "Polaris Sound Lab",
-  "kinds": ["groove"],
+  "kinds": [
+    "groove"
+  ],
   "play": "https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html",
   "editor": "https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html",
   "cheat": "https://github.com/drophlex/dark-funk-durcal-synt-fm1/blob/main/manual/DarkFunkDurcal-Manual-EN-ES.pdf",

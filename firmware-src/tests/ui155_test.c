@@ -178,11 +178,13 @@ static int select_page(void)
     ok &= title_is("RITUAL");
     turn(EN_SELECT, 3);
     ok &= title_is("STRETCH");
+    turn(EN_SELECT, 2);                                 /* dfd6: LIVE NEXT after STRETCH */
+    ok &= title_is("NEXT");
     turn(EN_SELECT, 1);
     ok &= ui.home;
     turn(EN_SELECT, -1);
-    ok &= title_is("STRETCH");
-    turn(EN_SELECT, -4);
+    ok &= title_is("NEXT");
+    turn(EN_SELECT, -6);
     ok &= title_is("CLOCK");
     b0 = song.g[G_BPM];
     turn(EN_K1, 1);

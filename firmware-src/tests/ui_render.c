@@ -803,7 +803,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
        S_DETAIL, S_DETAIL_PLAYING, S_DETAIL_REST, S_DETAIL_DRUM, S_ROLL_MARKS, S_DRUM_MARKS, S_HELP_DETAIL,
        S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
-       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_DFD_RITUAL, S_DFD_MELODY, S_DFD_DICE, S_DFD_STRETCH, S_DFD_CALM, S_DFD_MID, S_DFD_FURY, S_DFD_HOME_FURY, S_DFD_TAPE, S_COUNT };
+       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_DFD_RITUAL, S_DFD_MELODY, S_DFD_DICE, S_DFD_STRETCH, S_DFD_CALM, S_DFD_MID, S_DFD_FURY, S_DFD_HOME_FURY, S_DFD_TAPE, S_DFD_LIVE, S_DFD_NEXT, S_COUNT };
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -834,7 +834,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
     "detail_cond", "detail_fill", "auto_cond", "layer_glo_fill", "layer_seq_euclid", "layer_seq_euclid_drum",
     "layer_seq_euclid_64",
     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
-    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold", "dfd_ritual", "dfd_melody", "dfd_dice", "dfd_stretch", "dfd_eye_calm", "dfd_eye_mid", "dfd_eye_fury", "dfd_home_fury", "dfd_tape"};
+    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold", "dfd_ritual", "dfd_melody", "dfd_dice", "dfd_stretch", "dfd_eye_calm", "dfd_eye_mid", "dfd_eye_fury", "dfd_home_fury", "dfd_tape", "dfd_live", "dfd_next"};
 
 /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
@@ -1012,6 +1012,7 @@ static void setup(int s)
     state();
     memset(drum_mute, 0, sizeof drum_mute);          /* (1.4.1: no DRUM lane muted) */
     dfd_ins_force = -1;
+    memset(&lv, 0, sizeof lv); dfd_live_fx = 0; perf_k[0] = 0; nx.on = 0; nx.pick = 0; nx.tgt = 3;
     switch (s) {
     case S_HOME: song.octave = 2; song.rec = 1; usb.config = 1; break;
     case S_HOME_IDLE: song.playing = 0; song.batt_raw = 570; ui.hot_col = 1; ui.hot_t = 30; break;
@@ -1265,6 +1266,8 @@ static void setup(int s)
     case S_DFD_FURY: dfd_ins_force = 250; go_title_page("RITUAL"); break;
     case S_DFD_HOME_FURY: dfd_ins_force = 250; go_home(); break;
     case S_DFD_TAPE: song.g[G_DRLVL] = 7; song.g[G_DRREV] = 64; song.g[G_DFDBK] = 70; song.g[G_DMIX] = 60; go_title_page("TAPE ECHO"); break;
+    case S_DFD_LIVE: lv.mutes = 5; lv.rep = 2; lv.build = 60; lv.thr = 1; dfd_live_apply(); go_title_page("LIVE"); break;
+    case S_DFD_NEXT: dfd_summon(); nx.tgt = 3; nx_capture(); nx.pick = 1; nx_apply(); go_title_page("NEXT"); break;
     case S_EDIT_PHASE_FOLD: eng(2); TSEL->p[P_E7] = 80; go_title("EDIT 2"); ui.hot_col = 3; ui.hot_t = 30; break;   /* 1.5.5 FOLD (#104) */
     case S_ALG1: case S_ALG2: case S_ALG3: case S_ALG4: case S_ALG5: case S_ALG6: case S_ALG7: case S_ALG8:
         eng(1); TSEL->p[P_E0] = (int16_t)(s - S_ALG1);      /* the 8 DIGITAL charts; FB on the odd ones, IDX high .. 0 */
@@ -2271,7 +2274,7 @@ int main(int argc, char **argv)
     const char *out = argc > 1 ? argv[1] : "build/ui_new";
     char path[600];
     uint32_t p, s;
-    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT"};   /* (NIGHT: #50, to review) */
+    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT", "DURCAL"};   /* (DURCAL: the manual's pictures) */   /* (NIGHT: #50, to review) */
     if (getenv("DFD_SPLASH")) {                      /* Dark Funk Durcal: the boot animation's frames, OUT/ppm/DURCAL_splash_<ms> */
         static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600};
         char nm[32];

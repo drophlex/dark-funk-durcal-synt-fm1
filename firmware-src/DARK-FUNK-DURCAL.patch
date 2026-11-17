@@ -20,1066 +20,12 @@ index b835dec..2229a9e 100644
      "",                          /* 1 DIGITAL (retired) */
      "LKPLUU",                    /* 2 PHASE: BRASS, ORGAN, STRING, RESO, BELL, WIRE */
      "LBLLL",                     /* 3 LOFI: PULSE LD, WAVE BASS, ARP 8BIT, WAVE LEAD, STEP LEAD */
-diff --git a/firmware/src/eng_fm6.c b/firmware/src/eng_fm6.c
-index 5381bc3..765f847 100644
---- a/firmware/src/eng_fm6.c
-+++ b/firmware/src/eng_fm6.c
-@@ -35,6 +35,7 @@
-  * changes) and the LFO (once a block). */
- #include "fm6_core.c"
- #include "felucca_fm6.h"         /* tools/gen_fm6_patches.py: FM6_INIT, FM6_FACTORY[] */
-+#include "dfd_bank.h"            /* Dark Funk Durcal: B1..B32 built in (DFD_BANK) under the user's bank */
- 
- #define ENGI_FM6 12u             /* engines.c ENGINES[] (append-only) */
- #define FM6_POLY 6               /* engine_t.poly */
-@@ -69,7 +70,11 @@ static int32_t fm6_bank_slot(int32_t s)
- static int fm6_slot_ok(int32_t s)
- {
-     int32_t k = fm6_bank_slot(s);
-+#ifdef DFD_NO_BANK                                          /* (the upstream behaviour: host tests of the user bank) */
-     return k < 0 ? s >= 0 && s <= (int32_t)FM6_OWN : (int)((fm6_bank_used >> k) & 1u);
-+#else
-+    return k < 0 ? s >= 0 && s <= (int32_t)FM6_OWN : 1;    /* Dark Funk Durcal: every bank slot has a voice (DFD_BANK) */
-+#endif
- }
- 
- /* ------------------------------------------------------- patch formats --- */
-@@ -184,8 +189,12 @@ static int fm6_load_slot(uint32_t tr, uint32_t s)
-     if (k < 0) {
-         s %= FM6_NFACTORY;
-         memcpy(pk, FM6_FACTORY[s], FM6_PACKED);
--    } else if (!fm6_slot_ok((int32_t)s) || !fm6_bank_read || fm6_bank_read((uint32_t)k, pk)) {
-+    } else if (!((fm6_bank_used >> k) & 1u) || !fm6_bank_read || fm6_bank_read((uint32_t)k, pk)) {
-+#ifdef DFD_NO_BANK
-         return 1;
-+#else
-+        memcpy(pk, DFD_BANK[(uint32_t)k % 32u], FM6_PACKED);   /* Dark Funk Durcal: the built-in voice */
-+#endif
-     }
-     fm6_unpack(pk, v);
-     fm6_set_patch(tr, v);
-diff --git a/firmware/src/felucca.c b/firmware/src/felucca.c
-index c3b4889..c70252e 100644
---- a/firmware/src/felucca.c
-+++ b/firmware/src/felucca.c
-@@ -109,6 +109,7 @@ static __attribute__((noinline)) int c1_wait(void) { return fm1_cpu1_wait(); }
- #include "ui_menu.c"
- #include "ui_input.c"
- #include "ui_layer.c"              /* the quick layers (FX GLO SCL EDIT REC held; SEQ TOOLS: ui_tools.c) */
-+#include "dfd.c"                   /* Dark Funk Durcal: RITUAL MELODY DICE STRETCH, the eye */
- 
- /* --------------------------------------------- storage, update, editor --- */
- #if FELUCCA_FLASH
-diff --git a/firmware/src/fx.c b/firmware/src/fx.c
-index d2bcf92..9f4d44e 100644
---- a/firmware/src/fx.c
-+++ b/firmware/src/fx.c
-@@ -555,6 +555,59 @@ static __attribute__((noinline)) void rev_switch(const int32_t *rev_in, int32_t
-     fx.rtype = (uint8_t)rt;
- }
- 
-+/* TAPE ECHO (Dark Funk Durcal): the delay as a three-head tape loop (the spring-and-tape echoes of the 70s). MENU-free:
-+ * the FX family's TAPE ECHO page, G_DRLVL (HEADS: OFF H1 H2 H3 H1+2 H2+3 H1+3 ALL) and G_DRREV (WOW 0..127: wow, flutter
-+ * and tape saturation). HEADS OFF: the delay bit for bit as before. The heads at TIME x1 x2 x3 (the 3 limited to the
-+ * line), read between samples while the wow (~0.6 Hz) and the flutter (~6 Hz) move the tape; the repeats come back
-+ * through the low-pass COLOR, a ~150 Hz high-pass (the thin tape) and a soft saturation, so a high FDBK self-oscillates
-+ * but stays bounded (the line is int16, the sum is the mean of the heads) */
-+static const uint8_t TAPE_HEADS[8] = {0, 1, 2, 4, 3, 6, 5, 7};
-+static uint32_t tape_wow_ph, tape_flt_ph;
-+static int32_t tape_hp;
-+static int32_t tape_read(uint32_t dq8)                   /* the line dq8 / 256 samples back */
-+{
-+    uint32_t ri = dq8 >> 8;
-+    int32_t f = (int32_t)(dq8 & 255u), c0 = dly_buf[(fx.dly_w - ri) & (DLY_LEN - 1u)];
-+    int32_t c1 = dly_buf[(fx.dly_w - ri - 1u) & (DLY_LEN - 1u)];
-+    return c0 + (((c1 - c0) * f) >> 8);
-+}
-+static int32_t tape_sat(int32_t x, int32_t amt)          /* soft: x - x^3 / 3, amt 0..32767 of it */
-+{
-+    int32_t c;
-+    x = clamp(x, -32767, 32767);
-+    c = ((x * x) >> 15) * x >> 15;
-+    return x - mulq15(c / 3, amt);
-+}
-+static __attribute__((noinline)) void tape_echo(const int32_t *dly_in, int32_t *wet, uint32_t n, uint32_t dl, int32_t fb,
-+                                                int32_t col, int32_t dmix)
-+{
-+    uint32_t i, m = TAPE_HEADS[song.g[G_DRLVL] & 7], top = m & 4u ? 3u : m & 2u ? 2u : 1u, nh, h;
-+    int32_t wow = clamp(song.g[G_DRREV], 0, 127), wdep = wow * 20 * 256 / 127, fdep = wow * 3 * 256 / 127;
-+    int32_t sat = 6000 + wow * 200, hscale;
-+    uint32_t base = dl * top < DLY_LEN - 64u ? dl : (DLY_LEN - 64u) / top;
-+    nh = (m & 1u) + ((m >> 1) & 1u) + ((m >> 2) & 1u);
-+    hscale = nh == 1u ? 32767 : nh == 2u ? 23170 : 18918;   /* 1, 1/sqrt 2, 1/sqrt 3 */
-+    for (i = 0; i < n; i++) {
-+        int32_t mod = (osc_sine(tape_wow_ph) * wdep >> 15) + (osc_sine(tape_flt_ph) * fdep >> 15), sum = 0, x, fbs;
-+        tape_wow_ph += 58447u;                       /* 0.6 Hz */
-+        tape_flt_ph += 557000u;                      /* 5.7 Hz */
-+        for (h = 0; h < 3u; h++)
-+            if (m >> h & 1u) {
-+                int32_t d = (int32_t)(base * (h + 1u) << 8) + mod * (int32_t)(h + 1u);
-+                sum += tape_read((uint32_t)clamp(d, 16 << 8, (int32_t)(DLY_LEN - 4u) << 8));
-+            }
-+        x = mulq15(sum, hscale);                     /* heard: 1, 1/sqrt 2, 1/sqrt 3 of the heads */
-+        sum = nh == 1u ? sum : nh == 2u ? sum >> 1 : mulq15(sum, 10923);   /* fed back: their mean (loop gain < 1) */
-+        fx.dly_lp += mulq15(sum - fx.dly_lp, col);
-+        tape_hp += (fx.dly_lp - tape_hp) >> 6;       /* ~110 Hz */
-+        fbs = fx.dly_lp - tape_hp;
-+        dly_buf[fx.dly_w & (DLY_LEN - 1u)] =
-+            (int16_t)clamp(tape_sat((dly_in[i] >> 1) + mulq15(fbs, fb), sat), -32768, 32767);
-+        fx.dly_w++;
-+        wet[i] += mulq15(x << 1, dmix);
-+    }
-+}
-+
- /* process the three buses for one block; sends in, wet stereo-equal out */
- static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t *rev_in, int32_t *wet,
-                      uint32_t n)
-@@ -563,7 +616,7 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
-     int32_t fb = song.g[G_DFDBK] * 230, col = 2000 + song.g[G_DCOLOR] * 240;
-     int32_t dmix = song.g[G_DMIX] * 258;
-     int32_t cdepth = song.g[G_CDEPTH] * 6, rt;
--    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL;
-+    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL, tape = (song.g[G_DRLVL] & 7) != 0;
-     if (pf.ew1 && fb < THR_FB)
-         fb += mulq16(THR_FB - fb, (uint32_t)pf.ew1 << 1);   /* ECHO THROW (perform.c): more feedback while held, 0.7
-                                                              * at most (the loop's gain below 1: it never runs away) */
-@@ -580,6 +633,10 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
-             y += (c0 + (((c1 - c0) * f) >> 8)) << 1;
-         }
-         fx.cho_w++;
-+        if (tape) {                                  /* TAPE ECHO: after this loop (tape_echo) */
-+            wet[i] = y;
-+            continue;
-+        }
-         /* delay with a low-passed feedback */
-         x = dly_buf[(fx.dly_w - dl) & (DLY_LEN - 1u)];
-         fx.dly_lp += mulq15(x - fx.dly_lp, col);
-@@ -589,6 +646,8 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
-         y += mulq15(x << 1, dmix);
-         wet[i] = y;
-     }
-+    if (tape)
-+        tape_echo(dly_in, wet, n, dl, fb, col, dmix);
-     rt = song.g[G_RTYPE];
-     rt = rt == 1 || rt == 2 ? rt : 0;
-     hl.side = 0;
-diff --git a/firmware/src/main.c b/firmware/src/main.c
-index 69ba568..87dc364 100644
---- a/firmware/src/main.c
-+++ b/firmware/src/main.c
-@@ -156,10 +156,25 @@ static void fm1_main(void)
-         settings_save();
-     }
-     autosave_boot(boot_clean);                /* (1.2) the last session's music, under the splash */
--    for (ms = 0; ms < 400u; ms += 10u) {      /* the splash; the pot followed (MIDI IN plays under it) */
--        fm1_delay_ms(10);
--        master_poll();
--    }
-+    if (boot_clean && !(ui_prefs & PREF_ANIM_OFF)) {   /* Dark Funk Durcal: the animated eye (ui_draw.c), bounded:
-+                                                * at most 700 frames even if the ms tick stood still */
-+        uint32_t t0 = fm1_ms, t = 0, frames = 0;
-+        lcd_fill(0, 0, 240, 240, T_BG);
-+        while (t < DFD_SPLASH_MS + 500u && frames < 700u) {
-+            draw_splash_frame(t);
-+            fm1_wdt_feed();
-+            fm1_delay_ms(8);
-+            master_poll();
-+            frames++;
-+            t = fm1_ms - t0;
-+            if (t < frames * 8u)               /* the tick not running: time by the frames */
-+                t = frames * 8u;
-+        }
-+    } else
-+        for (ms = 0; ms < 400u; ms += 10u) {      /* the splash; the pot followed (MIDI IN plays under it) */
-+            fm1_delay_ms(10);
-+            master_poll();
-+        }
-     kb_boot_hold = 0;
-     lcd_fill(0, 0, 240, 240, T_BG);
-     scrn.idle = fm1_ms;                        /* (MENU > SCREEN OFF: from here) */
-diff --git a/firmware/src/panel.c b/firmware/src/panel.c
-index 95bf89e..f9af024 100644
---- a/firmware/src/panel.c
-+++ b/firmware/src/panel.c
-@@ -122,7 +122,7 @@ static void settings_init(void)
-     }
-     if (settings.magic != SETTINGS_MAGIC || settings.palette >= NPALETTES) {
-         settings.magic = SETTINGS_MAGIC;
--        settings.palette = UI_GREY_INDEX;      /* GREY (default; named MONO before 1.0.2) */
-+        settings.palette = UI_DURCAL_INDEX;    /* Dark Funk Durcal: DURCAL (Felucca: GREY) */
-         settings.lowcut = 0;
-         settings.zoom = 0;                     /* (retired: the LEDS setting, settings_persist.c) */
-     }
-diff --git a/firmware/src/params.c b/firmware/src/params.c
-index 4d00f50..0de1f5a 100644
---- a/firmware/src/params.c
-+++ b/firmware/src/params.c
-@@ -55,6 +55,7 @@ static const char *const N_NOTE[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G",
- static const char *const N_DASH[] = {"--"};
- static const char *const N_RTYPE[] = {"ROOM", "SPRING", "HALL"};   /* G_RTYPE: the reverb bus's model (fx.c) */
- static const char *const N_GO[] = {"--", "GO"};
-+static const char *const N_HEADS[] = {"OFF", "H1", "H2", "H3", "H1+2", "H2+3", "H1+3", "ALL"};   /* G_DRLVL: TAPE ECHO (fx.c) */
- static const char *const N_SLCR[] = {"OFF", "GATE", "STUT"};             /* SL_OFF .. SL_STUT (slicer.c) */
- static const char *const N_SLDIV[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};   /* SL_DEN */
- /* the INSERT's types (1.5, fx.c IT_*; append-only: stored). Its three values A B C mean what the type says (ins_desc) */
-@@ -230,8 +231,10 @@ static const param_desc_t GP[G_COUNT] = {
-     /* inert: they set the GM drum part (level, reverb send), which is gone (drums are the DRUM engine
-      * on any part). On no page; kept so the ids and G_COUNT, which the project format and the
-      * editor protocol depend on, do not move */
--    [G_DRLVL] = PD("-", F_INT, 0, 0, 0),
--    [G_DRREV] = PD("-", F_INT, 0, 0, 0),
-+    /* Dark Funk Durcal: the tape echo on the old GM drum part's ids (as G_RTYPE took G_DRCH's): HEADS and WOW (fx.c
-+     * tape_echo). 0 is OFF: projects of before keep the plain delay */
-+    [G_DRLVL] = PE("HEADS", N_HEADS, 0),
-+    [G_DRREV] = PD("WOW", F_PCT, 0, 127, 0),
- };
- 
- static const param_desc_t *track_desc(const track_t *t, uint32_t id)
-@@ -446,7 +449,8 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_FX, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE,
- enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACKS page (ui_input.c tracks_edit) */
- enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
-        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
--       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS };   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
-+       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS,
-+       GR_DFD_RITUAL, GR_DFD_MELODY, GR_DFD_DICE, GR_DFD_STRETCH };   /* Dark Funk Durcal (dfd.c) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
- 
- typedef struct {
-     const char *title;
-@@ -467,6 +471,7 @@ static const page_t PAGES[] = {
-     {"INSERT", FAM_FX, SC_TRACK, GR_INS, {P_ITYPE, P_IA, P_IB, P_IC}},   /* 1.5: the track's INSERT (fx.c) */
-     {"INSERT 2", FAM_FX, SC_TRACK, GR_INS, {P_IMIX, 0xFF, 0xFF, 0xFF}},  /* .. its dry / wet */
-     {"DLY", FAM_FX, SC_GLOBAL, GR_NONE, {G_DTIME, G_DFDBK, G_DCOLOR, G_DMIX}},
-+    {"TAPE ECHO", FAM_FX, SC_GLOBAL, GR_NONE, {G_DRLVL, G_DRREV, G_DFDBK, G_DMIX}},   /* Dark Funk Durcal (fx.c) */
-     {"REVERB", FAM_FX, SC_GLOBAL, GR_NONE, {G_RTYPE, G_RSIZE, G_RDAMP, 0xFF}},   /* TYPE: ROOM / SPRING / HALL */
-     {"CHORUS", FAM_FX, SC_GLOBAL, GR_NONE, {G_CRATE, G_CDEPTH, 0xFF, 0xFF}},
-     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, P_SCALE, P_QUANT, P_TRANS}},
-@@ -509,6 +514,11 @@ static const page_t PAGES[] = {
-      * GLO > GLOBAL; its TUNE is MENU > AUDIO's now), again HOME (ui.c home_tap) */
-     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},
-     {"CLOCK", FAM_TRK, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_CLOCK, 0xFF}},
-+    /* Dark Funk Durcal (dfd.c): HOME's taps go on to these, after CLOCK */
-+    {"RITUAL", FAM_TRK, SC_GLOBAL, GR_DFD_RITUAL, {0xFF, 0xFF, 0xFF, 0xFF}},
-+    {"MELODY", FAM_TRK, SC_GLOBAL, GR_DFD_MELODY, {0xFF, 0xFF, 0xFF, 0xFF}},
-+    {"DICE", FAM_TRK, SC_GLOBAL, GR_DFD_DICE, {0xFF, 0xFF, 0xFF, 0xFF}},
-+    {"STRETCH", FAM_TRK, SC_GLOBAL, GR_DFD_STRETCH, {0xFF, 0xFF, 0xFF, 0xFF}},
- };
- #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
- static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */
-diff --git a/firmware/src/project.c b/firmware/src/project.c
-index d267cd1..08918fe 100644
---- a/firmware/src/project.c
-+++ b/firmware/src/project.c
-@@ -290,6 +290,8 @@ static void proj_drums_to_part(project_t *q)
-     d->preset = PROJ_DEF_KEEP;
-     d->p[P_LEVEL] = (int16_t)clamp(q->g[G_DRLVL], 0, 127);   /* the drum part's level and reverb send */
-     d->p[P_REV] = (int16_t)clamp(q->g[G_DRREV], 0, 127);
-+    q->g[G_DRLVL] = 0;                          /* (now the TAPE ECHO's HEADS and WOW: params.c) */
-+    q->g[G_DRREV] = 0;
-     q->parts = NPART;
-     q->sum = proj_sum(q);
- }
-diff --git a/firmware/src/ui.c b/firmware/src/ui.c
-index e63d369..49ac0ec 100644
---- a/firmware/src/ui.c
-+++ b/firmware/src/ui.c
-@@ -39,6 +39,15 @@ static uint32_t user_of(const track_t *t)    /* user preset slot its sound came
-     return t->user && up_used(t->user - 1u) ? t->user - 1u : UP_SLOTS;
- }
- static uint32_t up_gen;                      /* bumped on every user bank change (redraws) */
-+/* Dark Funk Durcal's pages (dfd.c, included after the UI) */
-+static int dfd_page(uint32_t g);
-+static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps);
-+static void dfd_oct(void);
-+static const char *dfd_act_name(void);
-+static void dfd_graph(uint32_t g);
-+static void dfd_columns(uint32_t g);
-+static uint32_t dfd_sig(void);
-+static void dfd_home_eye(void);
- #include "favorites.c"
- #include "category.c"                   /* sound categories (Discussion #90): PRESETS > LIST */
- /* MENU's two-valued settings (ui_menu.c MENU_FLAGS), a bit each in a byte no engine uses (as ui_layer.c layer_seen):
-@@ -1778,6 +1787,7 @@ static uint32_t act_cols(void)                   /* the columns that are actions
-     if (ui.home)
-         return 0;
-     if (pg->graph == GR_EVENTS) return 16u;     /* AUTOMATION: no knob is an action; OCT+ by the row (ev_oct) */
-+    if (dfd_page(pg->graph)) return 16u;        /* Dark Funk Durcal: OCT+ SUMMON / MAKE / ROLL ALL / APPLY (dfd.c) */
-     if (pg->graph == GR_TOOLS) return 15u;
-     if (pg->graph == GR_SONG)
-         return 1u;                               /* PLAY / STOP (also the PLAY button) */
-@@ -1801,6 +1811,7 @@ static uint32_t act_col(void)
- {
-     if (!ui.home && cur_page()->graph == GR_SONG) return 1u;
-     if (!ui.home && cur_page()->graph == GR_EVENTS) return 5u;
-+    if (!ui.home && dfd_page(cur_page()->graph)) return 5u;
-     return !ui.home && cur_page()->graph == GR_PATS ? 2u : ui.act;
- }
- 
-@@ -1809,6 +1820,7 @@ static const char *act_name(uint32_t c)          /* column c's action (the foote
-     static const char *const UP_GO[3] = {"LOAD", "ERASE", "SAVE"};
-     uint32_t id = cur_page()->id[c & 3u];
-     if (cur_page()->graph == GR_EVENTS) return ev_act_name();
-+    if (dfd_page(cur_page()->graph)) return dfd_act_name();
-     if (cur_page()->graph == GR_TOOLS) {
-         static const char *const actions[] = {"CLEAR", "INIT", "DELETE", "CLEAR"};
-         return (c & 3u) == 1u && ui.tl_clean ? "CLEAN" : actions[c & 3u];   /* (1.5.5: KNOB 2 on: CLEAN INIT) */
-@@ -1834,6 +1846,7 @@ static int act_ready(void)
-     if (!c--)
-         return 0;
-     if (cur_page()->graph == GR_EVENTS) return ev_act_ready();
-+    if (dfd_page(cur_page()->graph)) return !chain_busy();
-     if (cur_page()->graph == GR_TOOLS)                  /* one case per column: CLEAR PAT, INIT, DELETE ROW, CLEAR SONG */
-         return !chain_busy() && (c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u ? 1 :
-                                  c == 2u ? ui.song_row < chain_config.count : chain_config.count != 0u);
-diff --git a/firmware/src/ui_draw.c b/firmware/src/ui_draw.c
-index 762d5a9..2f24680 100644
---- a/firmware/src/ui_draw.c
-+++ b/firmware/src/ui_draw.c
-@@ -992,6 +992,10 @@ static void draw_columns(void)
-         }
-         return;
-     }
-+    if (dfd_page(cur_page()->graph)) {                 /* Dark Funk Durcal (dfd.c) */
-+        dfd_columns(cur_page()->graph);
-+        return;
-+    }
-     if (cur_page()->graph == GR_SONG) {             /* SECTION, TRACK, its PAT (A..D, -), REPS (the section's) */
-         uint32_t row = ui.song_row < CHAIN_ROWS ? ui.song_row : CHAIN_ROWS - 1u, k = ui.song_trk % NTRK, sl;
-         int used = row < chain_config.count;
-@@ -1386,6 +1390,173 @@ static void draw_splash(void)
-     lcd_sync();
- }
- 
-+
-+/* ===================================================================== DARK FUNK DURCAL
-+ * The animated eye splash (Dark Funk Durcal Synt, based on Felucca 1.8.2): after the Felucca credit square,
-+ * main.c draws it frame by frame for DFD_SPLASH_MS: dots, the ring, the triangle, the tendrils grow, the eye
-+ * opens, the title is typed and the music line fades in. Canvas only (two bands: 240 x 124 and 240 x 110),
-+ * integer maths, bounded loops. Not with MENU > ANIM OFF or after a crash (main.c). */
-+#define DFD_SPLASH_MS 4400u
-+static const int16_t DFD_SIN[256] = {0,402,804,1205,1606,2006,2404,2801,3196,3590,3981,4370,4756,5139,5520,5897,6270,6639,7005,7366,7723,8076,8423,8765,9102,9434,9760,10080,10394,10702,11003,11297,11585,11866,12140,12406,12665,12916,13160,13395,13623,13842,14053,14256,14449,14635,14811,14978,15137,15286,15426,15557,15679,15791,15893,15986,16069,16143,16207,16261,16305,16340,16364,16379,16384,16379,16364,16340,16305,16261,16207,16143,16069,15986,15893,15791,15679,15557,15426,15286,15137,14978,14811,14635,14449,14256,14053,13842,13623,13395,13160,12916,12665,12406,12140,11866,11585,11297,11003,10702,10394,10080,9760,9434,9102,8765,8423,8076,7723,7366,7005,6639,6270,5897,5520,5139,4756,4370,3981,3590,3196,2801,2404,2006,1606,1205,804,402,0,-402,-804,-1205,-1606,-2006,-2404,-2801,-3196,-3590,-3981,-4370,-4756,-5139,-5520,-5897,-6270,-6639,-7005,-7366,-7723,-8076,-8423,-8765,-9102,-9434,-9760,-10080,-10394,-10702,-11003,-11297,-11585,-11866,-12140,-12406,-12665,-12916,-13160,-13395,-13623,-13842,-14053,-14256,-14449,-14635,-14811,-14978,-15137,-15286,-15426,-15557,-15679,-15791,-15893,-15986,-16069,-16143,-16207,-16261,-16305,-16340,-16364,-16379,-16384,-16379,-16364,-16340,-16305,-16261,-16207,-16143,-16069,-15986,-15893,-15791,-15679,-15557,-15426,-15286,-15137,-14978,-14811,-14635,-14449,-14256,-14053,-13842,-13623,-13395,-13160,-12916,-12665,-12406,-12140,-11866,-11585,-11297,-11003,-10702,-10394,-10080,-9760,-9434,-9102,-8765,-8423,-8076,-7723,-7366,-7005,-6639,-6270,-5897,-5520,-5139,-4756,-4370,-3981,-3590,-3196,-2801,-2404,-2006,-1606,-1205,-804,-402};
-+#define DFD_S(a) ((int32_t)DFD_SIN[(uint32_t)(a) & 255u])
-+#define DFD_C(a) ((int32_t)DFD_SIN[((uint32_t)(a) + 64u) & 255u])
-+static uint32_t dfd_isqrt(uint32_t v)
-+{
-+    uint32_t r = 0, b = 1u << 30;
-+    while (b > v)
-+        b >>= 2;
-+    while (b) {
-+        if (v >= r + b) { v -= r + b; r = (r >> 1) + b; }
-+        else r >>= 1;
-+        b >>= 2;
-+    }
-+    return r;
-+}
-+static int32_t dfd_ease(int32_t t, int32_t t0, int32_t len)       /* 0..256, eased out */
-+{
-+    int32_t u;
-+    if (t <= t0) return 0;
-+    if (t >= t0 + len) return 256;
-+    u = 256 - (t - t0) * 256 / len;
-+    return 256 - u * u / 256 * u / 256;
-+}
-+static void dfd_dot(int32_t x, int32_t y, int32_t th, uint16_t c)
-+{
-+    cv_rect(x - th / 2, y - th / 2, th, th, c);
-+}
-+static void dfd_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t th, uint16_t c)
-+{
-+    int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
-+    int32_t dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
-+    int32_t err = dx + dy, guard = 600;
-+    while (guard--) {
-+        int32_t e2 = 2 * err;
-+        dfd_dot(x0, y0, th, c);
-+        if (x0 == x1 && y0 == y1) break;
-+        if (e2 >= dy) { err += dy; x0 += sx; }
-+        if (e2 <= dx) { err += dx; y0 += sy; }
-+    }
-+}
-+static void dfd_disc(int32_t cx, int32_t cy, int32_t r, uint16_t c)
-+{
-+    int32_t dy;
-+    for (dy = -r; dy <= r; dy++) {
-+        int32_t w = (int32_t)dfd_isqrt((uint32_t)(r * r - dy * dy));
-+        cv_rect(cx - w, cy + dy, 2 * w + 1, 1, c);
-+    }
-+}
-+/* an arc of the circle from the top, `upto` of 256, dashed when dash */
-+static void dfd_ring(int32_t cx, int32_t cy, int32_t r, int32_t upto, int32_t dash, int32_t rot, int32_t th, uint16_t c)
-+{
-+    int32_t i;
-+    for (i = 0; i < upto && i < 256; i += 4) {
-+        int32_t a = i - 64 + rot;
-+        if (dash && ((i >> 3) & 1)) continue;
-+        dfd_line(cx + r * DFD_C(a) / 16384, cy + r * DFD_S(a) / 16384, cx + r * DFD_C(a + 4) / 16384,
-+                 cy + r * DFD_S(a + 4) / 16384, th, c);
-+    }
-+}
-+static void dfd_text_c(int32_t y, const aafont_t *f, const char *s, uint16_t fg, uint16_t bg)
-+{
-+    int32_t w = text_w(f, s);
-+    cv_text_on((240 - w) / 2, y, f, s, fg, bg);
-+}
-+static __attribute__((unused)) void draw_splash_frame(uint32_t tms)
-+{
-+    int32_t t = (int32_t)tms, cx = 120, cy = 62, r = 42, k, side;
-+    int32_t ring = dfd_ease(t, 150, 650), tri = dfd_ease(t, 450, 700), grow = dfd_ease(t, 700, 800);
-+    int32_t open = dfd_ease(t, 1250, 450), flash = t > 1550 && t < 2100 ? (2100 - t) * 256 / 550 : 0;
-+    uint16_t bone = T_TEXT, bg = T_BG, faint = ux_mix(T_BG, T_TEXT, 30), red = T_REC;
-+    /* ------------------------------------------------ band 1: the sigil and the eye (240 x 124 at y 4) */
-+    cv_begin(240, 124, bg);
-+    if (flash > 0)
-+        dfd_disc(cx, cy, r + 10 + flash / 32, ux_mix(T_BG, T_TEXT, 6 + flash / 40));
-+    for (k = 0; k < 18 && k * 70 < t; k++) {                             /* the dots */
-+        int32_t a = k * 256 / 18 - 64, rr = r + 18;
-+        dfd_dot(cx + rr * DFD_C(a) / 16384 * 3 / 2, cy + rr * DFD_S(a) / 16384, k % 3 ? 2 : 4, faint);
-+    }
-+    if (grow > 0)                                                         /* the tendrils, tapered */
-+        for (side = -1; side <= 1; side += 2)
-+            for (k = 0; k < 5; k++) {
-+                int32_t y0 = (k - 2) * 15, len = (68 - (k == 2 ? 0 : 8) - (k == 0 || k == 4 ? 10 : 0)) * grow / 256, j, px = 0, py = 0;
-+                for (j = 0; j <= 10; j++) {
-+                    int32_t u = j * 256 / 10, x = cx + side * (r + 6 + len * j / 10);
-+                    int32_t wob = DFD_S(j * 20 + (t >> 3) + k * 40) * 4 * u / 256 / 16384;
-+                    int32_t y = cy + y0 * (128 + u / 2) / 192 + wob, th = 5 - (j * 4) / 10 - (k == 2 ? 0 : 1);
-+                    if (th < 1) th = 1;
-+                    if (j) dfd_line(px, py, x, y, th, k == 2 ? bone : faint);
-+                    px = x; py = y;
-+                }
-+            }
-+    dfd_disc(cx, cy, r - 1, bg);
-+    dfd_ring(cx, cy, r + 6, ring, 1, t / 40, 3, bone);                  /* the dashed outer ring, turning */
-+    dfd_ring(cx, cy, r - 2, ring, 0, 0, 1, faint);
-+    if (tri > 0) {                                                        /* the triangle, drawn side by side */
-+        int32_t P[4][2] = {{cx, cy - r + 1}, {cx + r * 87 / 100, cy + r / 2}, {cx - r * 87 / 100, cy + r / 2}, {cx, cy - r + 1}};
-+        int32_t done = tri * 3, s2;
-+        for (s2 = 0; s2 < 3 && done > 0; s2++) {
-+            int32_t u = done > 256 ? 256 : done;
-+            dfd_line(P[s2][0], P[s2][1], P[s2][0] + (P[s2 + 1][0] - P[s2][0]) * u / 256,
-+                     P[s2][1] + (P[s2 + 1][1] - P[s2][1]) * u / 256, 3, bone);
-+            done -= 256;
-+        }
-+    }
-+    {   /* the eye: lids (two parabolas), the iris and pupil inside them */
-+        int32_t W = 26, H = 1 + 15 * open / 256, x, y;
-+        int32_t ix = cx + (open > 200 ? (DFD_S(t >> 4) * 4 / 16384) : 0), ir = 10, pr = 4 + flash / 64;
-+        for (y = -ir; y <= ir; y++)                                       /* the iris, clipped by the lids */
-+            for (x = -ir; x <= ir; x++) {
-+                int32_t d2 = x * x + y * y, ax = ix + x - cx, lim;
-+                if (d2 > ir * ir) continue;
-+                if (ax < -W || ax > W) continue;
-+                lim = H * (W * W - ax * ax) / (W * W);
-+                if (y > lim || y < -lim) continue;
-+                cv_pset(ix + x, cy + y, d2 > (ir - 2) * (ir - 2) ? bone : (d2 <= pr * pr ? (d2 <= 2 ? bg : bone) : (flash > 64 ? red : bg)));
-+            }
-+        for (x = -W; x < W; x += 2) {                                     /* the lids */
-+            int32_t y0 = H * (W * W - x * x) / (W * W), y1 = H * (W * W - (x + 2) * (x + 2)) / (W * W);
-+            dfd_line(cx + x, cy - y0, cx + x + 2, cy - y1, 2, bone);
-+            dfd_line(cx + x, cy + y0, cx + x + 2, cy + y1, 2, bone);
-+        }
-+        if (t > 1700) {                                                   /* the drop below the eye */
-+            int32_t dyy = cy + r / 2 + 8 + (t > 2000 ? (t - 2000) / 150 : 0);
-+            dfd_disc(cx, dyy, 3, bone);
-+            dfd_line(cx, dyy - 6, cx, dyy - 2, 2, bone);
-+        }
-+    }
-+    cv_blit(0, 4);
-+    /* ------------------------------------------------ band 2: the words (240 x 110 at y 130) */
-+    cv_begin(240, 110, bg);
-+    if (t > 1500) {
-+        static const char TITLE[] = "DARK FUNK DURCAL";
-+        char b[20];
-+        int32_t n = (t - 1500) / 45, i;
-+        if (n > 16) n = 16;
-+        for (i = 0; i < n; i++) b[i] = TITLE[i];
-+        b[n] = 0;
-+        cv_text_on((240 - text_w(&AF_M, TITLE)) / 2, 2, &AF_M, b, bone, bg);
-+    }
-+    if (t > 2150)
-+        dfd_text_c(22, &AF_M, "S Y N T", t > 2300 ? bone : faint, bg);
-+    if (t > 2250 && t < 3500) {                       /* what is it: the music, everywhere */
-+        uint16_t c = t > 2450 ? ux_mix(T_BG, T_TEXT, 75) : faint;
-+        cv_rect(40, 43, 160, 1, faint);
-+        dfd_text_c(50, &AF_S, "WHAT IS DARK FUNK DURCAL?", t > 2450 ? bone : faint, bg);
-+        dfd_text_c(66, &AF_S, "SEARCH IT ON SPOTIFY, YOUTUBE", c, bg);
-+        dfd_text_c(80, &AF_S, "AND EVERY AUDIO PLATFORM", c, bg);
-+    }
-+    if (t >= 3500) {                                  /* who made it */
-+        uint16_t c = t > 3700 ? bone : faint;
-+        cv_rect(40, 43, 160, 1, faint);
-+        dfd_text_c(48, &AF_S, "CREATED AT POLARIS SOUND LAB", c, bg);
-+        dfd_text_c(63, &AF_S, "MERIDA, YUCATAN, MEXICO", t > 3700 ? ux_mix(T_BG, T_TEXT, 70) : faint, bg);
-+        dfd_text_c(80, &AF_S, "INSTAGRAM @polaris.sound.lab", t > 3700 ? red : faint, bg);
-+        dfd_text_c(95, &AF_S, "YOUTUBE @PolarisSoundLab", t > 3700 ? red : faint, bg);
-+    }
-+    cv_blit(0, 130);
-+    lcd_sync();
-+}
-+
- /* UPDATE MODE countdown (main.c: OCT- + OCT+ held): over everything, the menu and the dialogs too */
- static void draw_uboot(void)
- {
-diff --git a/firmware/src/ui_graph.c b/firmware/src/ui_graph.c
-index 0ae1efb..4425488 100644
---- a/firmware/src/ui_graph.c
-+++ b/firmware/src/ui_graph.c
-@@ -1138,6 +1138,8 @@ static uint32_t strip_kind(void)
-     if (ui.home)
-         return SK_SCOPE;
-     g = cur_page()->graph;
-+    if (dfd_page(g))                                 /* Dark Funk Durcal: the eye and the dice keep their strip */
-+        return SK_NONE;                              /* (dfd_graph draws itself small in LG_H_GRAPH) */
-     return g == GR_ADSR ? SK_ADSR : g == GR_LFO ? SK_LFO : g == GR_TRK ? SK_TRK : SK_TITLE;
- }
- /* the page's title and its number in its family ("ENV DEST 2/2", EDIT: the engine's "OSC 1/2"); the piano roll: its
-@@ -1193,6 +1195,7 @@ static uint32_t graph_signature(void)
-     if (strip_kind() == SK_TITLE)                    /* MENU > LARGE: the page's title (its engine, its number) */
-         return h ^ 0x5A17u;
-     if (pg->graph == GR_NONE || pg->graph == GR_ARP) h ^= ui.frame / 2u;
-+    if (dfd_page(pg->graph)) h ^= ui.frame / 2u + dfd_sig() * 7u;   /* Dark Funk Durcal: the eye moves */
-     for (i = 0; i < P_COUNT; i++)
-         h = (h ^ (uint32_t)t->p[i]) * 16777619u;
-     h ^= (uint32_t)TSEL->preset * 7u + (uint32_t)song.g[G_SLOT] * 13u + TSEL->user * 257u + up_gen * 7919u + ui.uslot * 104729u +
-@@ -2257,7 +2260,10 @@ static void draw_graph(void)
-         uint32_t k = strip_kind();
-         cv_oy = k == SK_ADSR || k == SK_LFO ? 3 : 0;
-         graph_ht = LG_H_GRAPH - 6;
--        if (k == SK_SCOPE) graph_scope(c);
-+        if (k == SK_SCOPE) {
-+            graph_scope(c);
-+            if (ui.home) dfd_home_eye();             /* Dark Funk Durcal: the eye on HOME, LARGE too */
-+        }
-         else if (k == SK_ADSR) graph_adsr(t, c);
-         else if (k == SK_LFO) graph_lfo(t, c);
-         else graph_title();
-@@ -2265,6 +2271,7 @@ static void draw_graph(void)
-     } else if (ui.home) {
-         cv_oy = 0;
-         graph_scope(c);
-+        dfd_home_eye();                              /* Dark Funk Durcal: the eye on HOME (dfd.c) */
-     } else {
-         switch (pg->graph) {
-         case GR_ADSR:
-@@ -2330,6 +2337,13 @@ static void draw_graph(void)
-             cv_oy = 0;
-             panel_note("TURN TO PICK", "[OCT+] CONFIRM", 0);
-             break;
-+        case GR_DFD_RITUAL:
-+        case GR_DFD_MELODY:
-+        case GR_DFD_DICE:
-+        case GR_DFD_STRETCH:
-+            cv_oy = 0;
-+            dfd_graph(pg->graph);
-+            break;
- #if FELUCCA_SLICE
-         case GR_SLICES:
-             cv_oy = 0;
-diff --git a/firmware/src/ui_help.c b/firmware/src/ui_help.c
-index 0cdd918..b8ea15b 100644
---- a/firmware/src/ui_help.c
-+++ b/firmware/src/ui_help.c
-@@ -24,7 +24,8 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
-     {"SLICER", "[K1]ON[K2]PATTERN[FX]INSERT"},
-     {"INSERT", "[K1]TYPE[FX]DRY / WET"},
-     {"INSERT 2", "[K1]DRY / WET[FX]DLY"},
--    {"DLY", "[K1-4]ALL TRACKS[FX]REVERB"},
-+    {"DLY", "[K1-4]ALL TRACKS[FX]TAPE ECHO"},
-+    {"TAPE ECHO", "[K1]HEADS[K2]WOW[FX]REVERB"},
-     {"REVERB", "[K1]ROOM SPRING HALL[FX]CHORUS"},
-     {"CHORUS", "[K1-4]ALL TRACKS[FX]FX"},
-     {"SCL", "[K2]SCALE[K3]QUANTIZE[SCL]CHORDS"},
-@@ -54,6 +55,10 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
-     {"AUTOMATION", "[K1]ROW[OCT+]DO[EDIT]DELETE"},
-     {"MIXER", "[K4]MUTE[ALGO]TRACK[HOME]CLOCK"},
-     {"CLOCK", "[SELECT]TEMPO[GLO]HOLD: TAP"},
-+    {"RITUAL", "[K1-4]STYLES[OCT+]SUMMON"},
-+    {"MELODY", "[K3]SHAPE[OCT+]MAKE MELODY"},
-+    {"DICE", "[K1-4]ROLL[OCT+]ROLL ALL"},
-+    {"STRETCH", "[K2]STRETCH[OCT+]APPLY"},
- };
- #define H_HOME "[PRESETS]SOUND[HOME]HOLD: MENU"
- #define H_LEVELS "[K1-4]T1-T4 LEVEL[HOME]MIXER"
-diff --git a/firmware/src/ui_input.c b/firmware/src/ui_input.c
-index 5d181cf..3ba912c 100644
---- a/firmware/src/ui_input.c
-+++ b/firmware/src/ui_input.c
-@@ -1008,6 +1008,10 @@ static void edit_param(uint32_t slot, int32_t steps)
-         tracks_edit(slot, steps);
-         return;
-     }
-+    if (dfd_page(pg->graph)) {                            /* Dark Funk Durcal's pages (dfd.c) */
-+        dfd_knob(pg->graph, slot, steps);
-+        return;
-+    }
-     if (pg->graph == GR_BROWSE) {                         /* KNOB 1: one preset, KNOB 2: the next / previous engine */
-         if (slot == 0u) {
-             preset_step(steps);
-@@ -1084,6 +1088,10 @@ static void edit_param(uint32_t slot, int32_t steps)
- static void act_do(void)
- {
-     uint32_t c = act_col(), id, k = (uint32_t)song.g[G_SLOT] - 1u;
-+    if (dfd_page(cur_page()->graph)) {                    /* Dark Funk Durcal (dfd.c) */
-+        dfd_oct();
-+        return;
-+    }
-     if (!c--)
-         return;
-     if (cur_page()->graph == GR_EVENTS) {
-diff --git a/tests/golden.txt b/tests/golden.txt
-index 9e7f299..6e5762a 100644
---- a/tests/golden.txt
-+++ b/tests/golden.txt
-@@ -12,6 +12,16 @@ preset/ANALOG/08_PLUCK a8060629ca06fb68
- preset/ANALOG/09_BRASS 5687cf7b6f558044
- preset/ANALOG/10_WIND 8a038e70ab813a10
- preset/ANALOG/11_STRINGS 978e9d31de7cab88
-+preset/ANALOG/12_DFD_ACID fe1b03c542d42f08
-+preset/ANALOG/13_SQUELCH a2a328ca23113104
-+preset/ANALOG/14_BLACK_ACID 254707332f8f3c40
-+preset/ANALOG/15_RUBBER_ACID 9a0d58e70fca6fb8
-+preset/ANALOG/16_SERPENT ffd2850e5c06ea60
-+preset/ANALOG/17_ACID_LASER 4be8054034f9e660
-+preset/ANALOG/18_ACID_2 278b3f70cf432ac4
-+preset/ANALOG/19_REESE 387af8d312c18aa4
-+preset/ANALOG/20_DETUNE_PAD c90bdd09f19c5ab4
-+preset/ANALOG/21_BRAIN_LEAD 68a1da22cf93a6c8
- preset/PHASE/00_BRASS 36d318d48984648c
- preset/PHASE/01_ORGAN b856dd588dba78a0
- preset/PHASE/02_STRING 8b106b798f1afc04
-diff --git a/tests/project_test.c b/tests/project_test.c
-index 2c285d2..d058f2c 100644
---- a/tests/project_test.c
-+++ b/tests/project_test.c
-@@ -196,8 +196,8 @@ int main(void)
-     bad += check("FUN2 -> FUN6: converted, valid format 5 slot", ok && proj_ok(&q) && q.magic == PROJ_MAGIC);
-     ok = q.sel == 2;
-     for (i = 0; i < G_COUNT; i++)
--        ok &= q.g[i] == (i == G_RTYPE ? 0 : (int16_t)(500 + i));
--    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM) and selected track", ok);
-+        ok &= q.g[i] == (i == G_RTYPE || i == G_DRLVL || i == G_DRREV ? 0 : (int16_t)(500 + i));
-+    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM; 25 26 Dark Funk Durcal's TAPE ECHO: OFF) and selected track", ok);
-     ok = 1;
-     for (t = 0; t < NTRK; t++)
-         ok &= track_ok(&q.t[t], &v2.t[t], t, t == 3u, 127, 127);   /* (G_DRLVL / G_DRREV 525 / 526: 127) */
-diff --git a/tests/run_tests.sh b/tests/run_tests.sh
-index cb93324..7216415 100755
---- a/tests/run_tests.sh
-+++ b/tests/run_tests.sh
-@@ -303,7 +303,7 @@ if [ -f build/gen/felucca_tables.h ]; then
-     run "1.2 (FUN10): LFO 2 SYNC / TRIG / POL, NUDGE (record, QUANTIZE, play, controls), 128 motion records, FUN10 / FUN9 / FUN8 / FUN7, user presets" "$OUT/fun10_test"
-     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_drift_test" tests/midi_drift_test.c -lm
-     run "External-clock long-run phase: five 20-minute USB/TRS cases" "$OUT/midi_drift_test"
--    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
-+    $CC -O1 -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
-     run "USB/TRS clock, bend, sustain, ownership and panic recovery" "$OUT/midi_control_test"
-     $CC -O1 -w -DTIMER5_SYNTH_TEST=1 -Ibuild/gen -Ifirmware/src -o "$OUT/timer5_cc_clock_test" tests/timer5_midi_test.c -lm
-     run "TRS clock and four sequencers under saturated learned CCs (full upstream map)" "$OUT/timer5_cc_clock_test"
-@@ -358,12 +358,12 @@ if [ -f build/gen/felucca_tables.h ]; then
-     run "persistence: deferred settings, retry and failed-save rollback" "$OUT/persistence_test"
-     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/backup_test" tests/backup_test.c -lm
-     run "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" "$OUT/backup_test"
--    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
-+    $CC -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
-     run "FM6 voice bank (1.4.1): write / read, power cuts, CRC, SLOT B1..B32, stored SLOT values as before" "$OUT/fm6bank_test"
--    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
-+    $CC -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
-     run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (writes build/host/menu.json)" \
-         env MENU_JSON="$OUT/menu.json" "$OUT/editor_test"
--    $CC -w -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test_c1" tests/editor_test.c -lm
-+    $CC -w -DDFD_NO_BANK -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test_c1" tests/editor_test.c -lm
-     run "editor, a FELUCCA_CPU2=0 build: MENU settings without 2ND CORE (ids 0..31)" "$OUT/editor_test_c1"
-     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/robust_test" tests/robust_test.c -lm
-     run "robustness: crafted sample slots, engine numbers, retained old projects, preset patterns, malformed requests" \
-@@ -398,6 +398,9 @@ if [ -f build/gen/felucca_tables.h ]; then
-     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/reverb_test" tests/reverb_test.c -lm
-     mkdir -p build/reverb_demo
-     run "REVERB TYPE: ROOM / SPRING bit-identical, SPRING and HALL decay / stability / level, HALL silence / stereo / ringing, model changes, cost, demos" "$OUT/reverb_test" build/fx_demo build/reverb_demo
-+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/tape_test" tests/tape_test.c -lm
-+    mkdir -p build/tape_demo
-+    run "TAPE ECHO (Dark Funk Durcal): OFF untouched, every HEADS x WOW bounded, heads' times, mode changes, demos" "$OUT/tape_test" build/tape_demo
-     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
-     run "regression: golden renders, health, voices, CPU budget (2ND CORE OFF: one core)" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
-     $CC -O2 -w -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/regress_cpu2_0" tests/regress.c -lm
-@@ -462,7 +465,7 @@ if [ -f build/gen/felucca_tables.h ]; then
-     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/noise_test" tests/noise_test.c -lm
-     mkdir -p build/noise_demo
-     run "NOISE: colour slopes, key-tracked filter and clock, META period, DC, clipping, retrigger, cost, demos" "$OUT/noise_test" build/noise_demo
--    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_test" tests/fm6_test.c -lm
-+    $CC -O2 -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_test" tests/fm6_test.c -lm
-     mkdir -p build/fm6_demo
-     run "FM6: algorithms, envelopes, retrigger, DC, clipping, macros, patch formats, voices, cost, demos" "$OUT/fm6_test" build/fm6_demo
-     # SLICE is in the standard build (firmware/src/core.h): its test always runs (after #22 by andreahaku)
-@@ -523,7 +526,7 @@ else
-     $SCC -DOWN_PKG=1 -o "$A/ota_test" tests/ota_test.c
-     run "ASan/UBSan: M-UPGRADE entry (own loader)" "$A/ota_test" build/felucca.fwsc
-     for t in editor_test project_test backup_test robust_test fun10_test fm6bank_test midi_drift_test; do
--        $SCC -o "$A/$t" tests/$t.c -lm
-+        $SCC $(case $t in editor_test|fm6bank_test) echo -DDFD_NO_BANK;; esac) -o "$A/$t" tests/$t.c -lm
-         run "ASan/UBSan: $t" "$A/$t"
-     done
-     $SCC -DTIMER5_SYNTH_TEST=1 -o "$A/timer5_cc_clock_test" tests/timer5_midi_test.c -lm
-diff --git a/tests/settings_test.c b/tests/settings_test.c
-index c44636a..d5c02d2 100644
---- a/tests/settings_test.c
-+++ b/tests/settings_test.c
-@@ -45,7 +45,7 @@ int main(void)
-         /* 1.0.2: the old MONO keeps its id as GREY (a saved MONO looks the same); the new black and white MONO is
-          * appended, a new id */
-         assert(palette_from_stored(UI_PAL_TAG + 0u) == UI_GREY_INDEX && !strcmp(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
--        assert(UI_BW_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
-+        assert(UI_BW_INDEX == NPALETTES - 2u && UI_DURCAL_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
-                palette_from_stored(UI_PAL_TAG + UI_BW_INDEX) == UI_BW_INDEX && palette_stored_ok(UI_PAL_TAG + UI_BW_INDEX));
-         q.palette = palette_to_stored(5);
-         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 5u);
-diff --git a/tests/theme_test.c b/tests/theme_test.c
-index d4d3d33..6ac2c08 100644
---- a/tests/theme_test.c
-+++ b/tests/theme_test.c
-@@ -47,7 +47,7 @@ int main(int argc, char **argv)
-     static const uint8_t pd[] = {0x08, 0xf0};
-     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
-     double worst = 100;
--    assert(NPALETTES == 10u && !strcmp(UI_PALETTES[0].name, "GREY") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
-+    assert(NPALETTES == 11u && !strcmp(UI_PALETTES[10].name, "DURCAL") && UI_DURCAL_INDEX == 10u && !strcmp(UI_PALETTES[0].name, "GREY") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
-            !strcmp(UI_PALETTES[8].name, "NIGHT") && !strcmp(UI_PALETTES[9].name, "MONO") && UI_BW_INDEX == 9u);
-     /* (#50, 1.0.2: appended, the ids stay; GREY is the MONO of 1.0.1, id 0) */
-     for (unsigned st = ST_FLAT; st <= ST_LINE; st++) {   /* MONO: every token black or white (but its two colours), in FLAT and LINE */
-diff --git a/tests/ui155_test.c b/tests/ui155_test.c
-index fec7d0c..dc832b5 100644
---- a/tests/ui155_test.c
-+++ b/tests/ui155_test.c
-@@ -174,14 +174,20 @@ static int select_page(void)
-     ok = title_is("MIXER");
-     turn(EN_SELECT, 1);
-     ok &= title_is("CLOCK");
-+    turn(EN_SELECT, 1);                                 /* Dark Funk Durcal: RITUAL MELODY DICE STRETCH after CLOCK */
-+    ok &= title_is("RITUAL");
-+    turn(EN_SELECT, 3);
-+    ok &= title_is("STRETCH");
-     turn(EN_SELECT, 1);
-     ok &= ui.home;
-     turn(EN_SELECT, -1);
-+    ok &= title_is("STRETCH");
-+    turn(EN_SELECT, -4);
-     ok &= title_is("CLOCK");
-     b0 = song.g[G_BPM];
-     turn(EN_K1, 1);
-     ok &= song.g[G_BPM] == b0 + 1;                      /* CLOCK's KNOB 1: the tempo */
--    bad += check("  PAGE: HOME -> MIXER -> CLOCK -> HOME (as HOME's taps), back too; CLOCK's KNOB 1 still the tempo", ok);
-+    bad += check("  PAGE: HOME -> MIXER -> CLOCK -> RITUAL .. STRETCH -> HOME (as HOME's taps), back too; CLOCK's KNOB 1 still the tempo", ok);
- 
-     go_title("EDIT 1"); frame();
-     for (i = 0; i < 12u && ok; i++) {                   /* EDIT's pages: only the ones the engine shows */
-diff --git a/tests/ui_render.c b/tests/ui_render.c
-index 6563b2a..0bb92dd 100644
---- a/tests/ui_render.c
-+++ b/tests/ui_render.c
-@@ -803,7 +803,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
-        S_DETAIL, S_DETAIL_PLAYING, S_DETAIL_REST, S_DETAIL_DRUM, S_ROLL_MARKS, S_DRUM_MARKS, S_HELP_DETAIL,
-        S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
-        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
--       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_COUNT };
-+       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_DFD_RITUAL, S_DFD_MELODY, S_DFD_DICE, S_DFD_STRETCH, S_DFD_CALM, S_DFD_MID, S_DFD_FURY, S_DFD_HOME_FURY, S_DFD_TAPE, S_COUNT };
- static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
-     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
-     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
-@@ -834,7 +834,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
-     "detail_cond", "detail_fill", "auto_cond", "layer_glo_fill", "layer_seq_euclid", "layer_seq_euclid_drum",
-     "layer_seq_euclid_64",
-     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
--    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold"};
-+    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold", "dfd_ritual", "dfd_melody", "dfd_dice", "dfd_stretch", "dfd_eye_calm", "dfd_eye_mid", "dfd_eye_fury", "dfd_home_fury", "dfd_tape"};
- 
- /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
-  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
-@@ -1011,6 +1011,7 @@ static void setup(int s)
-     memset(kb_chn, 0, sizeof kb_chn);               /* no key held (roll_playing holds one) */
-     state();
-     memset(drum_mute, 0, sizeof drum_mute);          /* (1.4.1: no DRUM lane muted) */
-+    dfd_ins_force = -1;
-     switch (s) {
-     case S_HOME: song.octave = 2; song.rec = 1; usb.config = 1; break;
-     case S_HOME_IDLE: song.playing = 0; song.batt_raw = 570; ui.hot_col = 1; ui.hot_t = 30; break;
-@@ -1255,6 +1256,15 @@ static void setup(int s)
-     }
-     case S_EDIT_GRAIN: eng(8); go_title("EDIT 2"); break;
-     case S_EDIT_PHYS: eng(9); go_title("EDIT 1"); break;
-+    case S_DFD_RITUAL: go_title_page("RITUAL"); break;
-+    case S_DFD_MELODY: go_title_page("MELODY"); break;
-+    case S_DFD_DICE: go_title_page("DICE"); break;
-+    case S_DFD_STRETCH: go_title_page("STRETCH"); break;
-+    case S_DFD_CALM: dfd_ins_force = 10; go_title_page("RITUAL"); break;
-+    case S_DFD_MID: dfd_ins_force = 128; go_title_page("RITUAL"); break;
-+    case S_DFD_FURY: dfd_ins_force = 250; go_title_page("RITUAL"); break;
-+    case S_DFD_HOME_FURY: dfd_ins_force = 250; go_home(); break;
-+    case S_DFD_TAPE: song.g[G_DRLVL] = 7; song.g[G_DRREV] = 64; song.g[G_DFDBK] = 70; song.g[G_DMIX] = 60; go_title_page("TAPE ECHO"); break;
-     case S_EDIT_PHASE_FOLD: eng(2); TSEL->p[P_E7] = 80; go_title("EDIT 2"); ui.hot_col = 3; ui.hot_t = 30; break;   /* 1.5.5 FOLD (#104) */
-     case S_ALG1: case S_ALG2: case S_ALG3: case S_ALG4: case S_ALG5: case S_ALG6: case S_ALG7: case S_ALG8:
-         eng(1); TSEL->p[P_E0] = (int16_t)(s - S_ALG1);      /* the 8 DIGITAL charts; FB on the odd ones, IDX high .. 0 */
-@@ -2262,6 +2272,18 @@ int main(int argc, char **argv)
-     char path[600];
-     uint32_t p, s;
-     static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT"};   /* (NIGHT: #50, to review) */
-+    if (getenv("DFD_SPLASH")) {                      /* Dark Funk Durcal: the boot animation's frames, OUT/ppm/DURCAL_splash_<ms> */
-+        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600};
-+        char nm[32];
-+        state();
-+        pal(UI_DURCAL_INDEX);
-+        for (p = 0; p < sizeof T / sizeof T[0]; p++) {
-+            draw_splash_frame(T[p]);
-+            snprintf(nm, sizeof nm, "splash_%u", (unsigned)T[p]);
-+            write_ppm(out, "DURCAL", nm);
-+        }
-+        return 0;
-+    }
-     snprintf(path, sizeof path, "%s/report.txt", out);
-     rep = fopen(path, "w");
-     if (!rep) { fprintf(stderr, "cannot write %s\n", path); return 1; }
-diff --git a/tests/ui_test.c b/tests/ui_test.c
-index 50f528c..d4773fa 100644
---- a/tests/ui_test.c
-+++ b/tests/ui_test.c
-@@ -155,6 +155,7 @@ static struct { uint32_t stage; } felucca_dbg;
- #include "../firmware/src/ui_menu.c"
- #include "../firmware/src/ui_input.c"
- #include "../firmware/src/ui_layer.c"
-+#include "../firmware/src/dfd.c"
- #include "../firmware/src/upreset.c"
- #include "../firmware/src/project.c"
- 
-@@ -438,7 +439,7 @@ static int test_sound_loads(void)
-                  preset_pat_hint() == 12 && ui.ppick == 12 && str_eq(PATTERNS[12].name, "ARP"));
-     t->p[P_AMODE] = 2;
-     before = *t;
--    for (i = 0; i < 6u; i++)                      /* several loads, into the next engine */
-+    for (i = ENGINES[0]->npresets - t->preset; i; i--)   /* several loads, into the next engine (DFD: ANALOG has more) */
-         turn(EN_PRESET, 1);
-     bad += check("browsing on, into another engine: the steps still untouched", t->eng_req != before.eng_req &&
-                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_AMODE] == 2);
-@@ -1615,7 +1616,8 @@ static int test_display_preferences(void)
-                  settings.palette == 7 && (turn(EN_K1, 1), settings.palette == 8u) && T_BG == 0u &&
-                  str_eq(UI_PALETTES[8].name, "NIGHT") && (turn(EN_K1, 1), settings.palette == UI_BW_INDEX) &&
-                  str_eq(UI_PALETTES[UI_BW_INDEX].name, "MONO") && T_BG == 0u && T_TEXT == 0xFFFFu &&
--                 (turn(EN_K1, 1), settings.palette == UI_GREY_INDEX) && str_eq(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
-+                 (turn(EN_K1, 1), settings.palette == UI_DURCAL_INDEX) && str_eq(UI_PALETTES[UI_DURCAL_INDEX].name, "DURCAL") &&
-+                 (turn(EN_K1, 1), settings.palette == UI_GREY_INDEX) && str_eq(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));   /* Dark Funk Durcal: DURCAL after MONO */
-     settings.lowcut = 2;
-     ui.menu_sel = MI_LOWCUT;
-     press(B_OCTUP);
-@@ -2776,7 +2778,7 @@ static int test_page_cycles(void)
-         uint32_t f = PAGES[i].fam;
-         ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
-         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
--        ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK");   /* HOME's: MIXER CLOCK */
-+        ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK") || dfd_page(PAGES[i].graph);   /* HOME's: MIXER CLOCK (+ DFD's) */
-         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
-         ui_power_on(); ui.home = 0; ui.page = (uint8_t)i; page_entered();
-         ok &= FAM_BTN[cur_fam()] == (f == FAM_TRK ? B_HOME : f == FAM_GLO ? B_GLO : f == FAM_SEQ ? B_SEQ :
-@@ -2953,13 +2955,17 @@ static int test_product_ux(void)
-         ok &= song.g[G_BPM] == bpm + 1 && song.g[G_SWING] == swg + 1 && song.g[G_CLOCK] != clk && song.g[G_TUNE] == tune;
-         song.g[G_CLOCK] = clk;
-     }
-+    press(B_HOME);                                     /* Dark Funk Durcal: on to RITUAL MELODY DICE STRETCH, then HOME */
-+    ok &= str_eq(cur_page()->title, "RITUAL");
-+    press(B_HOME); press(B_HOME); press(B_HOME);
-+    ok &= str_eq(cur_page()->title, "STRETCH");
-     press(B_HOME);
-     ok &= ui.home && !ui.menu;
-     press(B_HOME);
-     ok &= cur_page()->graph == GR_TRK;
-     go_title("ENV"); press(B_HOME);
-     ok &= ui.home;
--    go_title("CLOCK"); press(B_HOME);
-+    go_title("STRETCH"); press(B_HOME);
-     ok &= ui.home;
-     bad += check("1.2: HOME cycles HOME > MIXER > CLOCK > HOME (CLOCK: BPM SWG CLK, HOME's LED); from any other page HOME", ok);
-     hold(B_HOME);
-@@ -9663,6 +9669,7 @@ static int test_home_tracks(void)
-     bad += check("1.3 HOME > TRACKS: K1..K4 edit the selected track (HOME's four), ALGORITHM moves the selected row", ok);
-     press(B_HOME); ok = !ui.home && cur_page()->graph == GR_TRK;
-     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
-+    press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME);   /* (Dark Funk Durcal's four pages) */
-     press(B_HOME); ok &= ui.home;
-     frame();
-     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;
-diff --git a/tools/build.py b/tools/build.py
-index b40a201..195efd0 100755
---- a/tools/build.py
-+++ b/tools/build.py
-@@ -389,6 +389,8 @@ def main():
-     ap = argparse.ArgumentParser()
-     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string vX.Y")
-     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
-+    ap.add_argument("--identity", metavar="FM-1_9NN", help="the package identity instead of --release's FM-1_9XY "
-+                    "(Dark Funk Durcal: its own number, FM-1_946)")
-     a = ap.parse_args()
-     name = "felucca.fwsc"
-     if a.release:                   # one digit each: the identity has room for two (X.Y.Z and X.Y.Z.W keep X.Y's)
-@@ -398,6 +400,10 @@ def main():
-         PRODUCT = "FM-1_9" + m[1] + m[2]
-         VERSION = "v" + a.release.lower()      # e.g. v1.0, v1.1-rc1
-         name = f"felucca-{a.release}.fwsc"
-+    if a.identity:
-+        if not re.fullmatch(r"FM-1_\d{3,10}", a.identity):
-+            raise SystemExit(f"--identity {a.identity}: use FM-1_ and digits")
-+        PRODUCT = a.identity
-     if not (FW / "engines" / "src" / "felucca_engine.h").exists():
-         raise SystemExit("firmware/engines is empty: the Felucca-Engines submodule "
-                          "(git submodule update --init, or clone with --recurse-submodules)")
-diff --git a/tools/gen_ui_palettes.py b/tools/gen_ui_palettes.py
-index a6674a0..b7c7372 100644
---- a/tools/gen_ui_palettes.py
-+++ b/tools/gen_ui_palettes.py
-@@ -55,6 +55,8 @@ PALETTES = [
-     # 1.0.2: black and white (the derived tokens are set, not blended: bw()); the old MONO is GREY (id 0)
-     # 1.8: its primary and secondary GREY's red and blue (were white)
-     ("MONO",   (0, 0, 0),       (255, 255, 255), (255, 255, 255), RED,       (72, 140, 255)),
-+    # Dark Funk Durcal: bone on near-black, blood red for the one active thing (appended: saved ids stay)
-+    ("DURCAL", (16, 12, 8),     (226, 212, 178), (238, 230, 212), RED,       (240, 96, 68)),
- ]
- BW = "MONO"
- BW_GREY = (82, 82, 82)             # MONO's one mid grey (RGB565 10/20/10): DIM LINE RAISE LANE
-@@ -194,7 +196,7 @@ def main():
-         for p in PALETTES:
-             v = [to565(c, p[0] == BW) for c in p[1:]]
-             out.append(f'    {{"{p[0]}", ' + ", ".join(f"0x{x:04x}" for x in v) + "},")
--        out += ["};", f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_GREY_INDEX 0u",
-+        out += ["};", f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_GREY_INDEX 0u", f"#define UI_DURCAL_INDEX {[n for n,*_ in PALETTES].index('DURCAL')}u",
-                 f"#define UI_BW_INDEX {names.index(BW)}u          /* MONO: black and white (src/gfx.c palette_set) */",
-                 f"#define UI_BW_GREY 0x{to565(BW_GREY):04x}u          /* MONO's one grey: DIM LINE RAISE LANE */",
-                 f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + index; below 20: an old id */"]
-diff --git a/web/editor.html b/web/editor.html
-index d9db178..f804100 100644
---- a/web/editor.html
-+++ b/web/editor.html
-@@ -1690,7 +1690,7 @@ function makeMockDevice(opt = {}) {
-       "GRAIN", "PHYS", "DRUM", "NOISE", "FM6", "SLICE"], 0), E("SET", NGO, 0),
-     E("CLRSQ", NGO, 0), E("INIT", NGO, 0),
-     E("TYPE", ["ROOM", "SPRING", "HALL"], 2),       /* G_RTYPE (id 24, was G_DRCH): the reverb's model (HALL: 1.2) */
--    D("-", F.INT, 0, 0, 0), D("-", F.INT, 0, 0, 0),   /* G_DRLVL, G_DRREV: inert since 1.0 */
-+    E("HEADS", ["OFF", "H1", "H2", "H3", "H1+2", "H2+3", "H1+3", "ALL"], 0), D("WOW", F.PCT, 0, 127, 0),   /* G_DRLVL, G_DRREV: Dark Funk Durcal TAPE ECHO (fx.c) */
-   ];
-   const NONE = D("-", F.INT, 0, 0, 0);
-   const RATIO = [".5", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "14", "16"];
-@@ -1703,7 +1703,17 @@ function makeMockDevice(opt = {}) {
-         P("ACID", [0, 0, 0, 0, 50, 100, 25, 64], [0, 55, 20, 30], 1, 1), P("SINE KEY", [3, 6, 50, 0, 127, 0, 0, 0], [2, 80, 30, 70], 0, 6),
-         P("RAVE", [4, 30, 64, 0, 85, 20, 30, 64], [20, 80, 110, 60], 1, 13), P("SUB BASS", [3, 0, 0, 0, 40, 0, 20, 0], [0, 60, 100, 20], 1, 8),
-         P("PLUCK", [0, 8, 50, 0, 30, 40, 0, 64], [0, 88, 0, 60], 0, 3), P("BRASS", [0, 10, 64, 0, 45, 20, 10, 64], [35, 70, 90, 45], 0, 6),
--        P("WIND", [0, 0, 0, 90, 30, 90, 0, 0], [60, 90, 60, 80], 0, 5), P("STRINGS", [0, 25, 64, 0, 70, 10, 0, 32], [70, 90, 115, 90], 0, 5)] },
-+        P("WIND", [0, 0, 0, 90, 30, 90, 0, 0], [60, 90, 60, 80], 0, 5), P("STRINGS", [0, 25, 64, 0, 70, 10, 0, 32], [70, 90, 115, 90], 0, 5),
-+        P("DFD ACID", [0, 0, 0, 0, 44, 108, 40, 64], [0, 50, 15, 25], 1, 1),
-+        P("SQUELCH", [0, 0, 0, 0, 30, 120, 55, 64], [0, 40, 10, 20], 1, 1),
-+        P("BLACK ACID", [0, 0, 30, 0, 26, 112, 100, 64], [0, 62, 25, 30], 1, 1),
-+        P("RUBBER ACID", [1, 0, 40, 0, 52, 80, 20, 64], [0, 70, 40, 30], 1, 1),
-+        P("SERPENT", [0, 0, 0, 0, 24, 124, 45, 64], [0, 90, 30, 40], 1, 1),
-+        P("ACID LASER", [0, 0, 0, 0, 16, 126, 80, 64], [0, 25, 0, 15], 1, 1),
-+        P("ACID 2", [1, 0, 0, 0, 40, 104, 35, 64], [0, 48, 15, 25], 1, 1),
-+        P("REESE", [0, 40, 64, 0, 40, 40, 30, 32], [0, 90, 100, 40], 1, 8),
-+        P("DETUNE PAD", [0, 30, 64, 6, 60, 15, 0, 32], [90, 90, 110, 100], 0, 5),
-+        P("BRAIN LEAD", [1, 14, 50, 0, 70, 50, 20, 64], [2, 60, 60, 40], 1, 4)] },
-     /* 1: reserved (DIGITAL, retired: src/fm4_convert.c ENG_FM4_GONE; its sounds load as FM6, FM4 above) */
-     { name: "-", titles: ["-", "-"], edit: [D("-", F.INT, 0, 7, 0), D("-", F.INT, 0, 14, 1), D("-", F.INT, 0, 14, 1),
-         D("-", F.INT, 0, 14, 1), D("-", F.PCT, 0, 127, 60), D("-", F.INT, 0, 127, 60), D("-", F.PCT, 0, 127, 0), NONE],
-@@ -2850,7 +2860,7 @@ const LAYOUT = (pe0) => [
-     ...[0, 1, 2, 3].map((k) => [`OP${k + 1}`, 0, [61 + 5 * k, 62 + 5 * k, 63 + 5 * k, 64 + 5 * k]]),
-     ["OP LVL", 0, [65, 70, 75, 80]]] }] : []),
-   { t: "VOICE", pages: [["LEVEL", 0, [0]], ["VOICE", 0, [37, 38, 41, 42]], ["VOICE 2", 0, [43, 44, 39, 40]]] },
--  { t: "FX", pages: [["FX", 0, [33, 34, 35, 36]], ["SLICER", 0, [45, 46, 47, 48]], ["DLY", 1, [4, 5, 6, 7]], ["REVERB", 1, [24, 8, 9]], ["CHORUS", 1, [10, 11]]] },   /* G_RTYPE 24: ROOM / SPRING / HALL */
-+  { t: "FX", pages: [["FX", 0, [33, 34, 35, 36]], ["SLICER", 0, [45, 46, 47, 48]], ["DLY", 1, [4, 5, 6, 7]], ["TAPE ECHO", 1, [25, 26, 5, 7]], ["REVERB", 1, [24, 8, 9]], ["CHORUS", 1, [10, 11]]] },   /* G_RTYPE 24: ROOM / SPRING / HALL */
-   { t: "SCL", pages: [["SCL", 0, [25, 26, 27, 28]], ...(pe0 >= 83 ? [["CHORD", 0, P_CHORD]] : [])] },   /* CHRD VOIC 81, 82 */
-   { t: "ARP", pages: [["ARP", 0, [17, 18, 19, 20]], ["ARP 2", 0, [21, 22, 23, 24]]] },
-   { t: "SEQ PATTERN", tab: "seqgroups", pages: [["PATTERN", 0, [29, 30, 31, 32]]] },
-diff --git a/web/test_web.mjs b/web/test_web.mjs
-index af3179f..1a704b8 100644
---- a/web/test_web.mjs
-+++ b/web/test_web.mjs
-@@ -295,8 +295,8 @@ async function editorMock() {
-     const inert = [25, 26].map(async (id) => E.parse[E.CMD.DESC](await rq(E.req.desc(1, id))));
-     const [d25, d26] = await Promise.all(inert);
-     ok(rd.label === "TYPE" && rd.def === 2 && eq(rd.names, ["ROOM", "SPRING", "HALL"]) && r1.value === 2 && r0.value === 0 &&
--       d25.label === "-" && d26.label === "-" && d25.max === 0 && info.gcount === 27,
--      "editor: REVERB TYPE (ROOM / SPRING / HALL, global id 24; 25, 26 still inert)");
-+       d25.label === "HEADS" && d26.label === "WOW" && d25.max === 7 && d26.max === 127 && d25.def === 0 && info.gcount === 27,
-+      "editor: REVERB TYPE (ROOM / SPRING / HALL, global id 24); 25, 26 Dark Funk Durcal's TAPE ECHO HEADS / WOW");
-   }
-   const st = E.parse[E.CMD.STEP_SET](await rq(E.req.stepSet(5, { n: 2, notes: [60, 64], time: 0, flags: 1, vel: 100 })));
-   ok(st.n === 2 && st.notes[1] === 64 && st.vel === 100, "editor: STEP_SET");
-diff --git a/firmware/engines/src/eng_analog.c b/firmware/engines/src/eng_analog.c
-index 6070915..2e29d6d 100644
---- a/firmware/engines/src/eng_analog.c
-+++ b/firmware/engines/src/eng_analog.c
-@@ -212,6 +212,17 @@ static const preset_t ANALOG_PRESETS[] = {
-     {"BRASS", {0, 10, 64, 0, 45, 20, 10, 64}, {35, 70, 90, 45}, 40, 0, FX(0, 20, 20, 40), PAT(6)},
-     {"WIND", {0, 0, 0, 90, 30, 90, 0, 0}, {60, 90, 60, 80}, 50, 0, FX(0, 30, 30, 70), PAT(5)},
-     {"STRINGS", {0, 25, 64, 0, 70, 10, 0, 32}, {70, 90, 115, 90}, 5, 0, FX(0, 60, 20, 70), PAT(5)},
-+    /* Dark Funk Durcal (Polaris Sound Lab): acid lines, a second acid, a reese, the detuned pad, a lead (append-only) */
-+    {"DFD ACID", {0, 0, 0, 0, 44, 108, 40, 64}, {0, 50, 15, 25}, 52, 1, FX(30, 0, 40, 12), PAT(1)},
-+    {"SQUELCH", {0, 0, 0, 0, 30, 120, 55, 64}, {0, 40, 10, 20}, 60, 1, FX(40, 0, 35, 10), PAT(1)},
-+    {"BLACK ACID", {0, 0, 30, 0, 26, 112, 100, 64}, {0, 62, 25, 30}, 56, 1, FX(90, 0, 30, 10), PAT(1)},
-+    {"RUBBER ACID", {1, 0, 40, 0, 52, 80, 20, 64}, {0, 70, 40, 30}, 36, 1, FX(10, 0, 25, 10), PAT(1)},
-+    {"SERPENT", {0, 0, 0, 0, 24, 124, 45, 64}, {0, 90, 30, 40}, 63, 1, FX(30, 0, 50, 20), PAT(1)},
-+    {"ACID LASER", {0, 0, 0, 0, 16, 126, 80, 64}, {0, 25, 0, 15}, 63, 1, FX(60, 0, 40, 10), PAT(1)},
-+    {"ACID 2", {1, 0, 0, 0, 40, 104, 35, 64}, {0, 48, 15, 25}, 50, 1, FX(25, 0, 35, 10), PAT(1)},
-+    {"REESE", {0, 40, 64, 0, 40, 40, 30, 32}, {0, 90, 100, 40}, 20, 1, FX(20, 30, 10, 15), PAT(8)},
-+    {"DETUNE PAD", {0, 30, 64, 6, 60, 15, 0, 32}, {90, 90, 110, 100}, 10, 0, FX(0, 70, 30, 80), PAT(5)},
-+    {"BRAIN LEAD", {1, 14, 50, 0, 70, 50, 20, 64}, {2, 60, 60, 40}, 30, 1, FX(10, 30, 40, 30), PAT(4)},
- };
- 
- static const engine_t ENG_ANALOG = {
-diff --git a/firmware/engines/tests/golden.txt b/firmware/engines/tests/golden.txt
-index f8dc696..fdf543f 100644
---- a/firmware/engines/tests/golden.txt
-+++ b/firmware/engines/tests/golden.txt
-@@ -10,6 +10,16 @@ analog/8 9762e62e1d4ec928 29050 PLUCK
- analog/9 67031ffbe9ff2a10 34774 BRASS
- analog/10 ea060ed5eb0583c4 52648 WIND
- analog/11 1cb924ba904425d8 43994 STRINGS
-+analog/12 fa1de2a4d569ac07 109138 DFD ACID
-+analog/13 ab377b9a3393a0e8 129632 SQUELCH
-+analog/14 82867e4b5a34a448 115942 BLACK ACID
-+analog/15 6dc70c2c23d9b838 54000 RUBBER ACID
-+analog/16 bda70cfbb7e34880 124224 SERPENT
-+analog/17 bb8b5a7c65cfe550 103268 ACID LASER
-+analog/18 fdbc799654972a47 92720 ACID 2
-+analog/19 7b8948a7ccc76479 28640 REESE
-+analog/20 ed46b4734e668e68 37852 DETUNE PAD
-+analog/21 f7b2f98832501656 47412 BRAIN LEAD
- lofi/0 a942d92723aed4f3 81346 PULSE LD
- lofi/1 2c881bde05296907 48079 WAVE BASS
- lofi/2 c0383ef92192379a 59620 ARP 8BIT
-@@ -59,6 +69,26 @@ analog/10/ftype1 7ab5ca8a7f6e191d 45246 WIND
- analog/10/ftype2 acd1547a601e8a28 105848 WIND
- analog/11/ftype1 8390db7c62134447 25748 STRINGS
- analog/11/ftype2 72b152cb7ca00dd0 59064 STRINGS
-+analog/12/ftype1 877ad800fe54e0d3 97558 DFD ACID
-+analog/12/ftype2 6a2ae7b7d482bb35 137506 DFD ACID
-+analog/13/ftype1 6af6e5ea85fc73c6 103852 SQUELCH
-+analog/13/ftype2 d13884d9cc669fb4 127304 SQUELCH
-+analog/14/ftype1 916275dcece41e4d 106786 BLACK ACID
-+analog/14/ftype2 b46538f8dbe67b65 136892 BLACK ACID
-+analog/15/ftype1 b1ab1d62128546d2 46684 RUBBER ACID
-+analog/15/ftype2 57ead689aad5179b 75874 RUBBER ACID
-+analog/16/ftype1 ef8e752140fb3ac1 124006 SERPENT
-+analog/16/ftype2 f913576d6d0090f8 138888 SERPENT
-+analog/17/ftype1 92d73b14d59230a9 121446 ACID LASER
-+analog/17/ftype2 6cd6106b3bf7c9f3 162292 ACID LASER
-+analog/18/ftype1 cfb263524771be71 91204 ACID 2
-+analog/18/ftype2 19828aa4f23f7b4b 120054 ACID 2
-+analog/19/ftype1 bdd215c472df6ce8 28364 REESE
-+analog/19/ftype2 59f143ad7948aeee 77688 REESE
-+analog/20/ftype1 f5fb700868fc02ff 25672 DETUNE PAD
-+analog/20/ftype2 027b7555dfe9ed32 65558 DETUNE PAD
-+analog/21/ftype1 2dfde47a1785dd2f 32400 BRAIN LEAD
-+analog/21/ftype2 a4cb96c59c5f2b9b 59096 BRAIN LEAD
- analog/e0=0 40407fd446d84b99 52758
- analog/e0=1 9275aa089a06d8b2 41680
- analog/e0=2 5489d525d1479940 47866
 diff --git a/firmware/src/dfd.c b/firmware/src/dfd.c
 new file mode 100644
-index 0000000..1f286e6
+index 0000000..626d8dd
 --- /dev/null
 +++ b/firmware/src/dfd.c
-@@ -0,0 +1,911 @@
+@@ -0,0 +1,1173 @@
 +/* SPDX-License-Identifier: GPL-3.0-only
 + * Dark Funk Durcal Synt (Polaris Sound Lab), on Felucca 1.8.2 (Hügelton Instruments).
 + *
@@ -1090,6 +36,8 @@ index 0000000..1f286e6
 + *   DICE     each KNOB turned right rolls a die: K1 the drums, K2 the acid, K3 the melody, K4 a sound; OCT+ ROLL ALL
 + *   STRETCH  SOURCE, STRETCH, PITCH, GRAIN; OCT+ APPLY: the selected track becomes a GRAIN time-stretch of a sample (a
 + *            set or USR1..3: your own recordings), the scan locked to the bars (LFO SAW, SYNC, FREE), pitch on its own
++ *   LIVE     (dfd6) MUTES, REPEAT, BUILD, THROW; OCT+ DROP: everything off at once
++ *   NEXT     (dfd6) PHRASE ORIGINAL / ANSWER / VARIATION / TENSION of T2..T4, heard at once; K4 new ones; OCT+ KEEP
 + * The eye: on these pages and on HOME. Integer maths, bounded loops; writes happen in the main loop (the UI), the way
 + * a pattern or a preset load does them (load_begin / load_end: one undo). */
 +
@@ -1140,6 +88,12 @@ index 0000000..1f286e6
 +    {"ELECTR", "DARK ELECTRO", 126, 136, MOOD_DARK, DK_GRID, 8, 2, 16, 12, 2, 8, 12, 0, 12, 0, 65, 35, 20, 6},
 +    {"AMBIEN", "AMBIENT IDM", 86, 104, MOOD_DREAMY, DK_GRID, 9, 1, 16, 0, 7, 0, 0, 20, 0, 1, 40, 35, 25, 10},
 +    {"FUNK", "BROKEN FUNK", 98, 116, MOOD_FUNKY, DK_GRID, 10, 1, 15, 12, 2, 4, 12, 0, 18, 1, 60, 40, 20, 25},
++    /* dfd6: warped funk (a talking vox lead over rubber bass, slow and swung), slap drum n bass (EP chords), a music-box
++     * IDM (prepared piano, broken beats), spectral step (vox and reese) */
++    {"WARPFK", "WARPED FUNK", 100, 108, MOOD_FUNKY, DK_GRID, 10, 1, 15, 12, 1, 2, 5, 1, 0, 0, 45, 45, 35, 28},
++    {"SLAPDN", "SLAP DNB", 168, 178, MOOD_FUNKY, DK_BREAK, 1, 0, 13, 12, 1, 4, 12, 1, 18, 1, 45, 40, 60, 4},
++    {"TOYBOX", "MUSIC BOX IDM", 112, 132, MOOD_MELAN, DK_GRID, 7, 3, 15, 12, 1, 3, 12, 1, 17, 0, 35, 60, 55, 8},
++    {"SPECTR", "SPECTRAL STEP", 134, 144, MOOD_HYPNO, DK_GRID, 8, 2, 16, 0, 19, 0, 5, 1, 0, 0, 50, 35, 30, 10},
 +};
 +#define DFD_NSTYLES (sizeof DFD_STYLES / sizeof DFD_STYLES[0])
 +/* the drum templates (16ths): x hit, g ghost, o open hat / accent; a style's set of 3 kicks, 3 snares, 2 hats */
@@ -1697,7 +651,101 @@ index 0000000..1f286e6
 +}
 +
 +/* ------------------------------------------------------------------ the pages' knobs and OCT+ --- */
-+static int dfd_page(uint32_t g) { return g >= GR_DFD_RITUAL && g <= GR_DFD_STRETCH; }
++static int dfd_page(uint32_t g) { return g >= GR_DFD_RITUAL && g <= GR_DFD_NEXT; }
++
++/* ------------------------------------------------------------------ LIVE (dfd6) --- */
++/* K1 MUTES: a set of the tracks out (perform.c's black-key mutes: ramped, never saved), K2 REPEAT OFF 1/8 1/16 1/32
++ * (the FX layer's REPEAT, from the next 1/16), K3 BUILD: the master HPF climbing (the FX macro FILTER, right), K4 THROW
++ * OFF ECHO REVERB BOTH; OCT+ DROP: all of it off at once (the drop after a build). The FX layer works beside it. */
++static const char *const LV_MUTE[8] = {"ALL IN", "NO DRUMS", "NO ACID", "NO BASS", "NO LEAD", "DRUMS ONLY", "DRUM+BASS", "LEAD ONLY"};
++static const uint8_t LV_MBITS[8] = {0, 1, 2, 4, 8, 14, 10, 7};
++static const char *const LV_REP[4] = {"OFF", "1/8", "1/16", "1/32"};
++static const char *const LV_THR[4] = {"OFF", "ECHO", "VERB", "BOTH"};
++static const char *const LV_MCOL[8] = {"ALL", "NO DR", "NO AC", "NO BS", "NO LD", "DRUMS", "DR+BS", "LEAD"};
++static struct { uint8_t mutes, rep, build, thr; uint32_t drop_ms; } lv;
++static void dfd_live_apply(void)
++{
++    uint32_t b = (uint32_t)LV_MBITS[lv.mutes & 7u] << PF_M1;
++    if (lv.rep)
++        b |= PF_BIT(PF_R8 + lv.rep - 1u);
++    if (lv.thr & 1u) b |= PF_BIT(PF_ETHR);
++    if (lv.thr & 2u) b |= PF_BIT(PF_RTHR);
++    if (lv.rep && !((b >> (PF_R8 + lv.rep - 1u)) & perf_avail() & 1u))
++        ui_message("TOO SLOW FOR 1/8");
++    dfd_live_fx = b;
++    perf_k[0] = (int8_t)lv.build;
++}
++static void dfd_drop(void)
++{
++    lv.mutes = lv.rep = lv.build = lv.thr = 0;
++    dfd_live_apply();
++    lv.drop_ms = fm1_ms;
++    dfd.flash_ms = fm1_ms;
++    ui_say("DROP ", "");
++}
++
++/* ------------------------------------------------------------------ NEXT (dfd6) --- */
++/* Three continuations of a track's phrase that always fit: 1 ANSWER (the line mirrored around its middle, home at the
++ * end), 2 VARIATION (some notes a step up or down), 3 TENSION (the second half climbing, ending open). K1 PHRASE
++ * ORIGINAL / 1 / 2 / 3 (heard at once, browsing: one undo), K2 TRACK T2..T4, K4 turned: new ones; OCT+ KEEP. */
++static const char *const NX_NAME[4] = {"ORIGINAL", "1 ANSWER", "2 VARIATION", "3 TENSION"};
++static const char *const NX_COL[4] = {"ORIG", "ANSWR", "VARI", "TENSE"};
++static struct { uint8_t on, pick, tgt, seed, len; step_t orig[NSTEP]; } nx = {0, 0, 3, 1, 16, {{{0}}}};
++static uint32_t nx_r;
++static uint32_t nx_rnd(void) { nx_r = nx_r * 1664525u + 1013904223u; return nx_r >> 9; }
++static int32_t dfd_deg(uint32_t note)                 /* the scale degree (above C3 in the key) nearest a note */
++{
++    int32_t d, best = 0, bd = 999;
++    for (d = -28; d <= 42; d++) {
++        int32_t e = (int32_t)dfd_note(d, 48) - (int32_t)note;
++        e = e < 0 ? -e : e;
++        if (e < bd) { bd = e; best = d; }
++    }
++    return best;
++}
++static void nx_apply(void)
++{
++    track_t *t = &trk[nx.tgt % NTRK];
++    uint32_t i, cnt = 0, last = 0, len = nx.len ? nx.len : 16u;
++    int32_t sum = 0, mid, n;
++    uint8_t iv[12];
++    n = (int32_t)dfd_scale(iv);
++    load_begin(t, UNDO_PAT);
++    memcpy(t->step, nx.orig, sizeof nx.orig);
++    t->p[P_SLEN] = (int16_t)len;
++    for (i = 0; i < len && i < NSTEP; i++)
++        if (nx.orig[i].time == ST_NOTE && nx.orig[i].n) { sum += dfd_deg(nx.orig[i].note[0]); cnt++; last = i; }
++    if (nx.pick && cnt) {
++        mid = sum / (int32_t)cnt;
++        nx_r = 0x51ED27u + nx.seed * 7919u + nx.pick * 104729u;
++        for (i = 0; i < len && i < NSTEP; i++) {
++            step_t *s = &t->step[i];
++            int32_t d, nd, delta, k;
++            if (s->time != ST_NOTE || !s->n)
++                continue;
++            d = dfd_deg(s->note[0]);
++            if (nx.pick == 1u)
++                nd = 2 * mid - d + (int32_t)(nx_rnd() % 3u) - 1;
++            else if (nx.pick == 2u)
++                nd = nx_rnd() % 100u < 35u ? d + (nx_rnd() & 1u ? 1 : -1) * (int32_t)(1u + nx_rnd() % 2u) : d;
++            else
++                nd = i >= len / 2u ? d + (int32_t)(i - len / 2u) / 3 + 1 : d;
++            if (i == last)                           /* the end: home (ANSWER, VARIATION) or open, a fifth up (TENSION) */
++                nd = nx.pick == 3u ? (mid / n) * n + 4 + n : (nd + n * 8) / n * n - n * 8 + ((nd % n + n) % n > n / 2 ? n : 0);
++            delta = (int32_t)dfd_note(nd, 48) - (int32_t)s->note[0];
++            for (k = 0; k < s->n && k < 4; k++)
++                s->note[k] = (uint8_t)clamp((int32_t)s->note[k] + delta, 24, 108);
++        }
++    }
++    load_end(t);
++}
++static void nx_capture(void)
++{
++    track_t *t = &trk[nx.tgt % NTRK];
++    memcpy(nx.orig, t->step, sizeof nx.orig);
++    nx.len = (uint8_t)clamp(t->p[P_SLEN], 1, NSTEP);
++    nx.on = 1;
++}
 +static int32_t dfd_step(int32_t v, int32_t d, int32_t lo, int32_t hi) { v += d; return v < lo ? lo : v > hi ? hi : v; }
 +static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps)
 +{
@@ -1714,6 +762,28 @@ index 0000000..1f286e6
 +    } else if (g == GR_DFD_DICE) {
 +        if (steps > 0)
 +            dfd_roll(slot);
++    } else if (g == GR_DFD_LIVE) {
++        if (slot == 0u) lv.mutes = (uint8_t)dfd_step(lv.mutes, steps > 0 ? 1 : -1, 0, 7);
++        if (slot == 1u) lv.rep = (uint8_t)dfd_step(lv.rep, steps > 0 ? 1 : -1, 0, 3);
++        if (slot == 2u) lv.build = (uint8_t)dfd_step(lv.build, steps * 3, 0, 100);
++        if (slot == 3u) lv.thr = (uint8_t)dfd_step(lv.thr, steps > 0 ? 1 : -1, 0, 3);
++        dfd_live_apply();
++    } else if (g == GR_DFD_NEXT) {
++        if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
++        if (slot == 1u) {
++            if (nx.on && nx.pick) { nx.pick = 0; nx_apply(); }
++            nx.on = 0;
++            nx.tgt = (uint8_t)dfd_step(nx.tgt, steps > 0 ? 1 : -1, 1, 3);
++        } else if (slot == 0u || (slot == 3u && steps > 0)) {
++            if (!nx.on)
++                nx_capture();
++            if (slot == 0u)
++                nx.pick = (uint8_t)dfd_step(nx.pick, steps > 0 ? 1 : -1, 0, 3);
++            else
++                nx.seed++;
++            nx_apply();
++            dfd.flash_ms = fm1_ms;
++        }
 +    } else {
 +        if (slot == 0u) dfd.src = (uint8_t)dfd_step(dfd.src, steps > 0 ? 1 : -1, 0, SMP_NALL - 1);
 +        if (slot == 1u) dfd.stretch = (uint8_t)dfd_step(dfd.stretch, steps > 0 ? 1 : -1, 0, 4);
@@ -1727,7 +797,7 @@ index 0000000..1f286e6
 +static void dfd_oct(void)
 +{
 +    uint32_t g = cur_page()->graph;
-+    if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
++    if (chain_busy() && g != GR_DFD_LIVE) { ui_message("STOP TO EDIT"); return; }
 +    if (g == GR_DFD_RITUAL) {
 +        dfd_summon();
 +    } else if (g == GR_DFD_MELODY) {
@@ -1745,6 +815,13 @@ index 0000000..1f286e6
 +        dfd.root = (uint8_t)dfd_pick(12);
 +        dfd_summon();
 +        dfd.last_roll = "EVERYTHING";
++    } else if (g == GR_DFD_LIVE) {
++        dfd_drop();
++    } else if (g == GR_DFD_NEXT) {
++        nx.on = 0;                                   /* KEEP: what plays stays; the next turn starts from it */
++        nx.pick = 0;
++        dfd.flash_ms = fm1_ms;
++        ui_say("KEPT", "");
 +    } else {
 +        dfd_stretch_apply();
 +    }
@@ -1753,7 +830,8 @@ index 0000000..1f286e6
 +static const char *dfd_act_name(void)
 +{
 +    uint32_t g = cur_page()->graph;
-+    return g == GR_DFD_RITUAL ? "SUMMON" : g == GR_DFD_MELODY ? "MAKE" : g == GR_DFD_DICE ? "ALL" : "APPLY";
++    return g == GR_DFD_RITUAL ? "SUMMON" : g == GR_DFD_MELODY ? "MAKE" : g == GR_DFD_DICE ? "ALL" : g == GR_DFD_LIVE ? "DROP" :
++           g == GR_DFD_NEXT ? "KEEP" : "APPLY";
 +}
 +
 +/* ------------------------------------------------------------------ the eye --- */
@@ -1847,6 +925,83 @@ index 0000000..1f286e6
 +        dfd_line(cx - W * 2 / 3, cy - H - 2, cx + W * 2 / 3, cy - H - 2, 1, faint);
 +    }
 +}
++/* SMEAR (dfd6): the eye as light through a broken screen. A pass over the canvas pixels the eye just drew (its box):
++ * each pixel's distance from the background is kept as its weight, its colour the split: ember on the left, white-hot
++ * in the middle, cold blue on the right (drifting a little); then columns of pixels dragged down (a pixel sort) and a
++ * row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
++static const uint8_t HOLO_RGB[8][3] = {{255, 58, 20}, {255, 79, 46}, {255, 138, 102}, {255, 244, 230},
++                                       {127, 224, 255}, {34, 176, 255}, {42, 95, 214}, {42, 95, 214}};
++static uint16_t dfd_hue(uint32_t h)                 /* h: 0..1791 left (ember) .. middle (white-hot) .. right (cold) */
++{
++    uint32_t i = h >= 1792u ? 6u : h >> 8, f = h >= 1792u ? 255u : h & 255u;
++    const uint8_t *a = HOLO_RGB[i], *b = HOLO_RGB[i + 1u];
++    return RGB((a[0] * (256u - f) + b[0] * f) >> 8, (a[1] * (256u - f) + b[1] * f) >> 8, (a[2] * (256u - f) + b[2] * f) >> 8);
++}
++static int dfd_grey(uint16_t c)
++{
++    int32_t r = ((c >> 11) & 31) * 2, g = (c >> 5) & 63, b = (c & 31) * 2;
++    return (r > g ? r - g : g - r) <= 4 && (b > g ? b - g : g - b) <= 4;
++}
++static int32_t dfd_lum(uint16_t c) { return ((c >> 11) & 31) * 2 + ((c >> 5) & 63) + (c & 31) * 2; }   /* 0..187 */
++static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
++{
++    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x, y;
++    int32_t lb = dfd_lum(cv_bg), sp = r > 0 ? 1536 / r : 64, drift = DFD_S(fm1_ms / 40u) * 90 / 16384;
++    uint32_t t = fm1_ms / 6u, z = (fm1_ms / 50u) * 2654435761u;
++    if (ux.mono || (ux.pal[0] == 0x0000u && ux.pal[2] == 0xFFFFu) || (dfd_grey(ux.text) && dfd_grey(ux.theme)))   /* GREY, MONO: no colour */
++        return;
++    if (x0 < 0) x0 = 0;
++    if (y0 < 0) y0 = 0;
++    if (x1 > (int32_t)cv_w) x1 = (int32_t)cv_w;
++    if (y1 > (int32_t)cv_h) y1 = (int32_t)cv_h;
++    if (x1 - x0 < 2 || y1 - y0 < 2)
++        return;
++    for (y = y0; y < y1; y++) {
++        uint16_t *row = &cv_px[(uint32_t)y * cv_w];
++        for (x = x0; x < x1; x++) {
++            uint16_t c = swap16(row[x]);
++            int32_t w = dfd_lum(c) - lb;
++            if (c == cv_bg)
++                continue;
++            w = (w < 0 ? -w : w) * 256 / 120;
++            if (w > 256) w = 256;
++            row[x] = swap16(ux_mix(cv_bg, dfd_hue((uint32_t)clamp(896 + (x - cx) * sp * 2 / 3 + drift, 0, 1791)), w * 100 / 256));
++        }
++    }
++    {                                                /* the drips: a column's pixel dragged down, fading */
++        uint32_t k, n = 2u + (uint32_t)tear / 12u, q = (fm1_ms / 70u) * 2246822519u + 1u;
++        for (k = 0; k < n; k++) {
++            int32_t px = x0 + (int32_t)((q >> 7) % (uint32_t)(x1 - x0)), py = y0 + (int32_t)((q >> 15) % (uint32_t)((y1 - y0) * 3 / 4 + 1));
++            int32_t len = 3 + (int32_t)((q >> 23) % (uint32_t)(r / 2 + 2 + tear / 8)), j;
++            uint16_t src = swap16(cv_px[(uint32_t)py * cv_w + (uint32_t)px]);
++            q = q * 1664525u + 1013904223u;
++            if (src == cv_bg)
++                continue;
++            for (j = 1; j < len && py + j < y1; j++) {
++                uint16_t *p = &cv_px[(uint32_t)(py + j) * cv_w + (uint32_t)px];
++                *p = swap16(ux_mix(swap16(*p), src, 90 - j * 80 / len));
++            }
++        }
++    }
++    if (tear > 0) {                                  /* the slices: rows of the box slid sideways */
++        uint32_t k, n = 1u + (uint32_t)tear / 48u;
++        for (k = 0; k < n; k++) {
++            int32_t h = 1 + (int32_t)((z >> 3) % 4u), ry = y0 + (int32_t)((z >> 9) % (uint32_t)(y1 - y0)), d = (int32_t)((z >> 17) % 9u) - 4, j;
++            d = d * (1 + tear / 64);
++            z = z * 1664525u + 1013904223u;
++            if (!d) d = 2;
++            for (j = 0; j < h && ry + j < y1; j++) {
++                uint16_t *row = &cv_px[(uint32_t)(ry + j) * cv_w];
++                if (d > 0) for (x = x1 - 1; x >= x0 + d; x--) row[x] = row[x - d];
++                else for (x = x0; x < x1 + d; x++) row[x] = row[x - d];
++            }
++        }
++        if ((z >> 5) & 1u) {                         /* a bar of foil */
++            int32_t bw = r / 2 + (int32_t)((z >> 11) % (uint32_t)(r + 1)), by = cy - r + (int32_t)((z >> 19) % (uint32_t)(2 * r + 1));
++            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, dfd_hue(t % 1792u));
++        }
++    }
++}
 +static void dfd_eye_auto(int32_t cx, int32_t cy, int32_t r)   /* blinking, looking around, flashing on a roll; its mood */
 +{
 +    uint32_t t = fm1_ms;
@@ -1873,6 +1028,7 @@ index 0000000..1f286e6
 +    if (ang < 70) pupil += r / 20;                   /* wide, dreamy */
 +    dfd_eye(cx + jx, cy + jy, r, open, DFD_S(t / (uint32_t)sp) * (r / 6) / 16384 + jx,
 +            DFD_S(t / (uint32_t)(sp + 7) + 64u) * (r / 14) / 16384, pupil, fl > 60 || lv > 200 || ang > 200, ang);
++    dfd_holo(cx, cy, r, fl / 2 + (ang > 190 ? (ang - 190) * 2 : 0) + (lv > 220 ? 40 : 0) + ((t % 3100u) < 90u ? 60 : 0));
 +}
 +static void dfd_home_eye(void) { dfd_eye_auto(212, 30, 20); }
 +
@@ -1940,6 +1096,44 @@ index 0000000..1f286e6
 +        cv_text_on(tx, dy + ds + 6, &AF_M, dfd.last_roll, T_TEXT, cv_bg);
 +        if (!small)
 +            cv_text_on(tx, 88, &AF_S, "TURN = ROLL", T_MID, cv_bg);
++    } else if (g == GR_DFD_LIVE) {
++        uint32_t age = fm1_ms - lv.drop_ms;
++        cv_text_on(tx, small ? 6 : 14, &AF_M, LV_MUTE[lv.mutes & 7u], lv.mutes ? T_ACCENT : T_TEXT, cv_bg);
++        str_cpy(b, "REPEAT ", sizeof b);
++        str_cpy(b + str_len(b), LV_REP[lv.rep & 3u], 6);
++        cv_text_on(tx, small ? 26 : 40, &AF_M, lv.rep ? b : lv.thr ? LV_THR[lv.thr & 3u] : "PLAY IT", T_THEME, cv_bg);
++        if (!small) {
++            uint32_t k;
++            for (k = 0; k < 4u; k++)                 /* the four tracks: lit in, dark out */
++                cv_rrect(tx + (int32_t)k * 22, 62, 18, 10, 3, (LV_MBITS[lv.mutes & 7u] >> k) & 1u ? ux_mix(cv_bg, T_TEXT, 20) : T_TEXT, cv_bg);
++            dfd_bar(tx + 92, 65, 36, lv.build);
++            cv_text_on(tx, 88, &AF_S, age < 900u ? "* DROP *" : "[OCT+] DROP", age < 900u ? T_ACCENT : T_MID, cv_bg);
++        }
++    } else if (g == GR_DFD_NEXT) {
++        const track_t *t = &trk[nx.tgt % NTRK];
++        str_cpy(b, "T", sizeof b);
++        b[1] = (char)('1' + nx.tgt % NTRK);
++        b[2] = 0;
++        str_cpy(b + 2, nx.on ? "  TRYING" : "  READY", 10);
++        cv_text_on(tx, small ? 6 : 14, &AF_M, NX_NAME[nx.pick & 3u], nx.pick ? T_ACCENT : T_TEXT, cv_bg);
++        cv_text_on(tx, small ? 26 : 40, &AF_S, b, T_MID, cv_bg);
++        if (!small) {                                /* the phrase: its first 16 steps, a dot a note */
++            uint32_t k, lo = 127, hi = 0;
++            for (k = 0; k < 16u; k++)
++                if (t->step[k].time == ST_NOTE && t->step[k].n) {
++                    if (t->step[k].note[0] < lo) lo = t->step[k].note[0];
++                    if (t->step[k].note[0] > hi) hi = t->step[k].note[0];
++                }
++            for (k = 0; k < 16u; k++) {
++                int32_t x = tx + (int32_t)k * 8;
++                cv_rect(x, 80, 6, 1, ux_mix(cv_bg, T_TEXT, 18));
++                if (t->step[k].time == ST_NOTE && t->step[k].n)
++                    dfd_disc(x + 3, 76 - (hi > lo ? (int32_t)(t->step[k].note[0] - lo) * 22 / (int32_t)(hi - lo) : 11), 3, T_TEXT);
++                else if (t->step[k].time == ST_TIE)
++                    cv_rect(x, 66, 6, 2, T_MID);
++            }
++            cv_text_on(tx, 88, &AF_S, "[OCT+] KEEP", T_MID, cv_bg);
++        }
 +    } else {
 +        cv_text_on(tx, small ? 6 : 14, &AF_M, SMP_ALL_NAMES[dfd.src % SMP_NALL], T_TEXT, cv_bg);
 +        str_cpy(b, STR_NAME[dfd.stretch % 5u], sizeof b);
@@ -1976,6 +1170,18 @@ index 0000000..1f286e6
 +        draw_column(1, "ACID", "ROLL", "", VAL(1u), -1, ICON_AUTO);
 +        draw_column(2, "MELODY", "ROLL", "", VAL(2u), -1, ICON_AUTO);
 +        draw_column(3, "SOUND", "ROLL", "", VAL(3u), -1, ICON_AUTO);
++    } else if (g == GR_DFD_LIVE) {
++        draw_column(0, "MUTES", LV_MCOL[lv.mutes & 7u], "", VAL(0u), (int32_t)lv.mutes * 1000 / 7, ICON_AUTO);
++        draw_column(1, "REPEAT", LV_REP[lv.rep & 3u], "", VAL(1u), (int32_t)lv.rep * 1000 / 3, ICON_AUTO);
++        fmt_int(v, lv.build);
++        draw_column(2, "BUILD", v, "%", VAL(2u), lv.build * 10, ICON_AUTO);
++        draw_column(3, "THROW", LV_THR[lv.thr & 3u], "", VAL(3u), (int32_t)lv.thr * 1000 / 3, ICON_AUTO);
++    } else if (g == GR_DFD_NEXT) {
++        static const char *const TN[4] = {"T1", "T2", "T3", "T4"};
++        draw_column(0, "PHRASE", NX_COL[nx.pick & 3u], "", VAL(0u), (int32_t)nx.pick * 1000 / 3, ICON_AUTO);
++        draw_column(1, "TRACK", TN[nx.tgt % NTRK], "", VAL(1u), (int32_t)(nx.tgt - 1u) * 500, ICON_AUTO);
++        draw_column(2, "-", "", "", VAL(2u), -1, ICON_AUTO);
++        draw_column(3, "NEW", "TURN", "", VAL(3u), -1, ICON_AUTO);
 +    } else {
 +        draw_column(0, "SOURCE", SMP_ALL_NAMES[dfd.src % SMP_NALL], "", VAL(0u), (int32_t)dfd.src * 1000 / (SMP_NALL - 1), ICON_AUTO);
 +        draw_column(1, "TIME", dfd.stretch ? (dfd.stretch == 4u ? "1/2" : dfd.stretch == 1u ? "1" : dfd.stretch == 2u ? "2" : "4") : "FREEZE",
@@ -1989,7 +1195,9 @@ index 0000000..1f286e6
 +static uint32_t dfd_sig(void)
 +{
 +    return (uint32_t)dfd.a * 3u + dfd.b * 37u + dfd.fusion * 101u + dfd.chaos * 1009u + dfd.mood * 7u + dfd.root * 17u + dfd.shape * 131u +
-+           dfd.notes * 1301u + dfd.src * 13u + dfd.stretch * 19u + (uint32_t)(dfd.pitch + 12) * 23u + dfd.grain * 29u + dfd.roll_ms;
++           dfd.notes * 1301u + dfd.src * 13u + dfd.stretch * 19u + (uint32_t)(dfd.pitch + 12) * 23u + dfd.grain * 29u + dfd.roll_ms +
++           lv.mutes * 41u + lv.rep * 43u + lv.build * 47u + lv.thr * 53u + lv.drop_ms + nx.pick * 59u + nx.tgt * 61u + nx.seed * 67u +
++           nx.on * 71u + track_sig(&trk[nx.tgt % NTRK]);
 +}
 diff --git a/firmware/src/dfd_bank.h b/firmware/src/dfd_bank.h
 new file mode 100644
@@ -2037,6 +1245,753 @@ index 0000000..2185db6
 +    {99, 70, 50, 55, 99, 95, 90, 0, 39, 0, 0, 0, 58, 8, 0, 2, 0, 99, 70, 50, 55, 99, 95, 90, 0, 39, 0, 0, 0, 58, 8, 0, 2, 0, 99, 70, 50, 55, 99, 95, 90, 0, 39, 0, 0, 0, 58, 8, 0, 2, 0, 99, 70, 50, 55, 99, 95, 90, 0, 39, 0, 0, 0, 58, 8, 0, 2, 0, 99, 85, 60, 80, 99, 0, 0, 0, 39, 0, 0, 0, 58, 8, 90, 6, 0, 99, 85, 60, 80, 99, 0, 0, 0, 39, 0, 0, 0, 58, 8, 99, 2, 0, 99, 50, 99, 99, 99, 30, 50, 50, 4, 13, 35, 0, 0, 0, 48, 24, 90, 65, 80, 32, 76, 65, 83, 69, 82, 32},
 +    {99, 58, 40, 60, 99, 45, 0, 0, 39, 0, 0, 0, 58, 8, 70, 2, 41, 99, 72, 50, 70, 99, 0, 0, 0, 39, 0, 0, 0, 34, 8, 90, 8, 21, 99, 58, 40, 60, 99, 45, 0, 0, 39, 0, 0, 0, 58, 8, 75, 10, 30, 99, 72, 50, 70, 99, 0, 0, 0, 39, 0, 0, 0, 74, 8, 95, 4, 76, 99, 58, 40, 60, 99, 45, 0, 0, 39, 0, 0, 0, 58, 8, 82, 6, 50, 99, 72, 50, 70, 99, 0, 0, 0, 39, 0, 0, 0, 58, 12, 99, 2, 0, 99, 99, 99, 99, 50, 50, 50, 50, 4, 8, 35, 0, 0, 0, 48, 24, 77, 85, 84, 65, 78, 84, 32, 66, 69, 76},
 +};
+diff --git a/firmware/src/eng_fm6.c b/firmware/src/eng_fm6.c
+index 5381bc3..765f847 100644
+--- a/firmware/src/eng_fm6.c
++++ b/firmware/src/eng_fm6.c
+@@ -35,6 +35,7 @@
+  * changes) and the LFO (once a block). */
+ #include "fm6_core.c"
+ #include "felucca_fm6.h"         /* tools/gen_fm6_patches.py: FM6_INIT, FM6_FACTORY[] */
++#include "dfd_bank.h"            /* Dark Funk Durcal: B1..B32 built in (DFD_BANK) under the user's bank */
+ 
+ #define ENGI_FM6 12u             /* engines.c ENGINES[] (append-only) */
+ #define FM6_POLY 6               /* engine_t.poly */
+@@ -69,7 +70,11 @@ static int32_t fm6_bank_slot(int32_t s)
+ static int fm6_slot_ok(int32_t s)
+ {
+     int32_t k = fm6_bank_slot(s);
++#ifdef DFD_NO_BANK                                          /* (the upstream behaviour: host tests of the user bank) */
+     return k < 0 ? s >= 0 && s <= (int32_t)FM6_OWN : (int)((fm6_bank_used >> k) & 1u);
++#else
++    return k < 0 ? s >= 0 && s <= (int32_t)FM6_OWN : 1;    /* Dark Funk Durcal: every bank slot has a voice (DFD_BANK) */
++#endif
+ }
+ 
+ /* ------------------------------------------------------- patch formats --- */
+@@ -184,8 +189,12 @@ static int fm6_load_slot(uint32_t tr, uint32_t s)
+     if (k < 0) {
+         s %= FM6_NFACTORY;
+         memcpy(pk, FM6_FACTORY[s], FM6_PACKED);
+-    } else if (!fm6_slot_ok((int32_t)s) || !fm6_bank_read || fm6_bank_read((uint32_t)k, pk)) {
++    } else if (!((fm6_bank_used >> k) & 1u) || !fm6_bank_read || fm6_bank_read((uint32_t)k, pk)) {
++#ifdef DFD_NO_BANK
+         return 1;
++#else
++        memcpy(pk, DFD_BANK[(uint32_t)k % 32u], FM6_PACKED);   /* Dark Funk Durcal: the built-in voice */
++#endif
+     }
+     fm6_unpack(pk, v);
+     fm6_set_patch(tr, v);
+diff --git a/firmware/src/felucca.c b/firmware/src/felucca.c
+index c3b4889..c70252e 100644
+--- a/firmware/src/felucca.c
++++ b/firmware/src/felucca.c
+@@ -109,6 +109,7 @@ static __attribute__((noinline)) int c1_wait(void) { return fm1_cpu1_wait(); }
+ #include "ui_menu.c"
+ #include "ui_input.c"
+ #include "ui_layer.c"              /* the quick layers (FX GLO SCL EDIT REC held; SEQ TOOLS: ui_tools.c) */
++#include "dfd.c"                   /* Dark Funk Durcal: RITUAL MELODY DICE STRETCH, the eye */
+ 
+ /* --------------------------------------------- storage, update, editor --- */
+ #if FELUCCA_FLASH
+diff --git a/firmware/src/fx.c b/firmware/src/fx.c
+index d2bcf92..9f4d44e 100644
+--- a/firmware/src/fx.c
++++ b/firmware/src/fx.c
+@@ -555,6 +555,59 @@ static __attribute__((noinline)) void rev_switch(const int32_t *rev_in, int32_t
+     fx.rtype = (uint8_t)rt;
+ }
+ 
++/* TAPE ECHO (Dark Funk Durcal): the delay as a three-head tape loop (the spring-and-tape echoes of the 70s). MENU-free:
++ * the FX family's TAPE ECHO page, G_DRLVL (HEADS: OFF H1 H2 H3 H1+2 H2+3 H1+3 ALL) and G_DRREV (WOW 0..127: wow, flutter
++ * and tape saturation). HEADS OFF: the delay bit for bit as before. The heads at TIME x1 x2 x3 (the 3 limited to the
++ * line), read between samples while the wow (~0.6 Hz) and the flutter (~6 Hz) move the tape; the repeats come back
++ * through the low-pass COLOR, a ~150 Hz high-pass (the thin tape) and a soft saturation, so a high FDBK self-oscillates
++ * but stays bounded (the line is int16, the sum is the mean of the heads) */
++static const uint8_t TAPE_HEADS[8] = {0, 1, 2, 4, 3, 6, 5, 7};
++static uint32_t tape_wow_ph, tape_flt_ph;
++static int32_t tape_hp;
++static int32_t tape_read(uint32_t dq8)                   /* the line dq8 / 256 samples back */
++{
++    uint32_t ri = dq8 >> 8;
++    int32_t f = (int32_t)(dq8 & 255u), c0 = dly_buf[(fx.dly_w - ri) & (DLY_LEN - 1u)];
++    int32_t c1 = dly_buf[(fx.dly_w - ri - 1u) & (DLY_LEN - 1u)];
++    return c0 + (((c1 - c0) * f) >> 8);
++}
++static int32_t tape_sat(int32_t x, int32_t amt)          /* soft: x - x^3 / 3, amt 0..32767 of it */
++{
++    int32_t c;
++    x = clamp(x, -32767, 32767);
++    c = ((x * x) >> 15) * x >> 15;
++    return x - mulq15(c / 3, amt);
++}
++static __attribute__((noinline)) void tape_echo(const int32_t *dly_in, int32_t *wet, uint32_t n, uint32_t dl, int32_t fb,
++                                                int32_t col, int32_t dmix)
++{
++    uint32_t i, m = TAPE_HEADS[song.g[G_DRLVL] & 7], top = m & 4u ? 3u : m & 2u ? 2u : 1u, nh, h;
++    int32_t wow = clamp(song.g[G_DRREV], 0, 127), wdep = wow * 20 * 256 / 127, fdep = wow * 3 * 256 / 127;
++    int32_t sat = 6000 + wow * 200, hscale;
++    uint32_t base = dl * top < DLY_LEN - 64u ? dl : (DLY_LEN - 64u) / top;
++    nh = (m & 1u) + ((m >> 1) & 1u) + ((m >> 2) & 1u);
++    hscale = nh == 1u ? 32767 : nh == 2u ? 23170 : 18918;   /* 1, 1/sqrt 2, 1/sqrt 3 */
++    for (i = 0; i < n; i++) {
++        int32_t mod = (osc_sine(tape_wow_ph) * wdep >> 15) + (osc_sine(tape_flt_ph) * fdep >> 15), sum = 0, x, fbs;
++        tape_wow_ph += 58447u;                       /* 0.6 Hz */
++        tape_flt_ph += 557000u;                      /* 5.7 Hz */
++        for (h = 0; h < 3u; h++)
++            if (m >> h & 1u) {
++                int32_t d = (int32_t)(base * (h + 1u) << 8) + mod * (int32_t)(h + 1u);
++                sum += tape_read((uint32_t)clamp(d, 16 << 8, (int32_t)(DLY_LEN - 4u) << 8));
++            }
++        x = mulq15(sum, hscale);                     /* heard: 1, 1/sqrt 2, 1/sqrt 3 of the heads */
++        sum = nh == 1u ? sum : nh == 2u ? sum >> 1 : mulq15(sum, 10923);   /* fed back: their mean (loop gain < 1) */
++        fx.dly_lp += mulq15(sum - fx.dly_lp, col);
++        tape_hp += (fx.dly_lp - tape_hp) >> 6;       /* ~110 Hz */
++        fbs = fx.dly_lp - tape_hp;
++        dly_buf[fx.dly_w & (DLY_LEN - 1u)] =
++            (int16_t)clamp(tape_sat((dly_in[i] >> 1) + mulq15(fbs, fb), sat), -32768, 32767);
++        fx.dly_w++;
++        wet[i] += mulq15(x << 1, dmix);
++    }
++}
++
+ /* process the three buses for one block; sends in, wet stereo-equal out */
+ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t *rev_in, int32_t *wet,
+                      uint32_t n)
+@@ -563,7 +616,7 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
+     int32_t fb = song.g[G_DFDBK] * 230, col = 2000 + song.g[G_DCOLOR] * 240;
+     int32_t dmix = song.g[G_DMIX] * 258;
+     int32_t cdepth = song.g[G_CDEPTH] * 6, rt;
+-    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL;
++    uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL, tape = (song.g[G_DRLVL] & 7) != 0;
+     if (pf.ew1 && fb < THR_FB)
+         fb += mulq16(THR_FB - fb, (uint32_t)pf.ew1 << 1);   /* ECHO THROW (perform.c): more feedback while held, 0.7
+                                                              * at most (the loop's gain below 1: it never runs away) */
+@@ -580,6 +633,10 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
+             y += (c0 + (((c1 - c0) * f) >> 8)) << 1;
+         }
+         fx.cho_w++;
++        if (tape) {                                  /* TAPE ECHO: after this loop (tape_echo) */
++            wet[i] = y;
++            continue;
++        }
+         /* delay with a low-passed feedback */
+         x = dly_buf[(fx.dly_w - dl) & (DLY_LEN - 1u)];
+         fx.dly_lp += mulq15(x - fx.dly_lp, col);
+@@ -589,6 +646,8 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
+         y += mulq15(x << 1, dmix);
+         wet[i] = y;
+     }
++    if (tape)
++        tape_echo(dly_in, wet, n, dl, fb, col, dmix);
+     rt = song.g[G_RTYPE];
+     rt = rt == 1 || rt == 2 ? rt : 0;
+     hl.side = 0;
+diff --git a/firmware/src/main.c b/firmware/src/main.c
+index 69ba568..87dc364 100644
+--- a/firmware/src/main.c
++++ b/firmware/src/main.c
+@@ -156,10 +156,25 @@ static void fm1_main(void)
+         settings_save();
+     }
+     autosave_boot(boot_clean);                /* (1.2) the last session's music, under the splash */
+-    for (ms = 0; ms < 400u; ms += 10u) {      /* the splash; the pot followed (MIDI IN plays under it) */
+-        fm1_delay_ms(10);
+-        master_poll();
+-    }
++    if (boot_clean && !(ui_prefs & PREF_ANIM_OFF)) {   /* Dark Funk Durcal: the animated eye (ui_draw.c), bounded:
++                                                * at most 700 frames even if the ms tick stood still */
++        uint32_t t0 = fm1_ms, t = 0, frames = 0;
++        lcd_fill(0, 0, 240, 240, T_BG);
++        while (t < DFD_SPLASH_MS + 500u && frames < 700u) {
++            draw_splash_frame(t);
++            fm1_wdt_feed();
++            fm1_delay_ms(8);
++            master_poll();
++            frames++;
++            t = fm1_ms - t0;
++            if (t < frames * 8u)               /* the tick not running: time by the frames */
++                t = frames * 8u;
++        }
++    } else
++        for (ms = 0; ms < 400u; ms += 10u) {      /* the splash; the pot followed (MIDI IN plays under it) */
++            fm1_delay_ms(10);
++            master_poll();
++        }
+     kb_boot_hold = 0;
+     lcd_fill(0, 0, 240, 240, T_BG);
+     scrn.idle = fm1_ms;                        /* (MENU > SCREEN OFF: from here) */
+diff --git a/firmware/src/panel.c b/firmware/src/panel.c
+index 95bf89e..f9af024 100644
+--- a/firmware/src/panel.c
++++ b/firmware/src/panel.c
+@@ -122,7 +122,7 @@ static void settings_init(void)
+     }
+     if (settings.magic != SETTINGS_MAGIC || settings.palette >= NPALETTES) {
+         settings.magic = SETTINGS_MAGIC;
+-        settings.palette = UI_GREY_INDEX;      /* GREY (default; named MONO before 1.0.2) */
++        settings.palette = UI_DURCAL_INDEX;    /* Dark Funk Durcal: DURCAL (Felucca: GREY) */
+         settings.lowcut = 0;
+         settings.zoom = 0;                     /* (retired: the LEDS setting, settings_persist.c) */
+     }
+diff --git a/firmware/src/params.c b/firmware/src/params.c
+index 4d00f50..ea145fb 100644
+--- a/firmware/src/params.c
++++ b/firmware/src/params.c
+@@ -55,6 +55,7 @@ static const char *const N_NOTE[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G",
+ static const char *const N_DASH[] = {"--"};
+ static const char *const N_RTYPE[] = {"ROOM", "SPRING", "HALL"};   /* G_RTYPE: the reverb bus's model (fx.c) */
+ static const char *const N_GO[] = {"--", "GO"};
++static const char *const N_HEADS[] = {"OFF", "H1", "H2", "H3", "H1+2", "H2+3", "H1+3", "ALL"};   /* G_DRLVL: TAPE ECHO (fx.c) */
+ static const char *const N_SLCR[] = {"OFF", "GATE", "STUT"};             /* SL_OFF .. SL_STUT (slicer.c) */
+ static const char *const N_SLDIV[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};   /* SL_DEN */
+ /* the INSERT's types (1.5, fx.c IT_*; append-only: stored). Its three values A B C mean what the type says (ins_desc) */
+@@ -230,8 +231,10 @@ static const param_desc_t GP[G_COUNT] = {
+     /* inert: they set the GM drum part (level, reverb send), which is gone (drums are the DRUM engine
+      * on any part). On no page; kept so the ids and G_COUNT, which the project format and the
+      * editor protocol depend on, do not move */
+-    [G_DRLVL] = PD("-", F_INT, 0, 0, 0),
+-    [G_DRREV] = PD("-", F_INT, 0, 0, 0),
++    /* Dark Funk Durcal: the tape echo on the old GM drum part's ids (as G_RTYPE took G_DRCH's): HEADS and WOW (fx.c
++     * tape_echo). 0 is OFF: projects of before keep the plain delay */
++    [G_DRLVL] = PE("HEADS", N_HEADS, 0),
++    [G_DRREV] = PD("WOW", F_PCT, 0, 127, 0),
+ };
+ 
+ static const param_desc_t *track_desc(const track_t *t, uint32_t id)
+@@ -446,7 +449,8 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_FX, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE,
+ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACKS page (ui_input.c tracks_edit) */
+ enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
+        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
+-       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS };   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
++       GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS,
++       GR_DFD_RITUAL, GR_DFD_MELODY, GR_DFD_DICE, GR_DFD_STRETCH, GR_DFD_LIVE, GR_DFD_NEXT };   /* Dark Funk Durcal (dfd.c) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
+ 
+ typedef struct {
+     const char *title;
+@@ -467,6 +471,7 @@ static const page_t PAGES[] = {
+     {"INSERT", FAM_FX, SC_TRACK, GR_INS, {P_ITYPE, P_IA, P_IB, P_IC}},   /* 1.5: the track's INSERT (fx.c) */
+     {"INSERT 2", FAM_FX, SC_TRACK, GR_INS, {P_IMIX, 0xFF, 0xFF, 0xFF}},  /* .. its dry / wet */
+     {"DLY", FAM_FX, SC_GLOBAL, GR_NONE, {G_DTIME, G_DFDBK, G_DCOLOR, G_DMIX}},
++    {"TAPE ECHO", FAM_FX, SC_GLOBAL, GR_NONE, {G_DRLVL, G_DRREV, G_DFDBK, G_DMIX}},   /* Dark Funk Durcal (fx.c) */
+     {"REVERB", FAM_FX, SC_GLOBAL, GR_NONE, {G_RTYPE, G_RSIZE, G_RDAMP, 0xFF}},   /* TYPE: ROOM / SPRING / HALL */
+     {"CHORUS", FAM_FX, SC_GLOBAL, GR_NONE, {G_CRATE, G_CDEPTH, 0xFF, 0xFF}},
+     {"SCL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, P_SCALE, P_QUANT, P_TRANS}},
+@@ -509,6 +514,13 @@ static const page_t PAGES[] = {
+      * GLO > GLOBAL; its TUNE is MENU > AUDIO's now), again HOME (ui.c home_tap) */
+     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},
+     {"CLOCK", FAM_TRK, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_CLOCK, 0xFF}},
++    /* Dark Funk Durcal (dfd.c): HOME's taps go on to these, after CLOCK */
++    {"RITUAL", FAM_TRK, SC_GLOBAL, GR_DFD_RITUAL, {0xFF, 0xFF, 0xFF, 0xFF}},
++    {"MELODY", FAM_TRK, SC_GLOBAL, GR_DFD_MELODY, {0xFF, 0xFF, 0xFF, 0xFF}},
++    {"DICE", FAM_TRK, SC_GLOBAL, GR_DFD_DICE, {0xFF, 0xFF, 0xFF, 0xFF}},
++    {"STRETCH", FAM_TRK, SC_GLOBAL, GR_DFD_STRETCH, {0xFF, 0xFF, 0xFF, 0xFF}},
++    {"LIVE", FAM_TRK, SC_GLOBAL, GR_DFD_LIVE, {0xFF, 0xFF, 0xFF, 0xFF}},       /* dfd6: play it live */
++    {"NEXT", FAM_TRK, SC_GLOBAL, GR_DFD_NEXT, {0xFF, 0xFF, 0xFF, 0xFF}},       /* dfd6: the next phrase x3 */
+ };
+ #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
+ static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */
+diff --git a/firmware/src/perform.c b/firmware/src/perform.c
+index 0f9108c..929e471 100644
+--- a/firmware/src/perform.c
++++ b/firmware/src/perform.c
+@@ -95,6 +95,7 @@ static volatile int8_t perf_k[4];     /* main: the knob macros, 0 = untouched: F
+                                        * CRUSH 0..100, THROW 0..100, DEPTH cut 0..100 (the buffer effects' level) */
+ static volatile uint32_t kb_layer;    /* ISR: the keys held that are the layer's, a bit per key */
+ static volatile uint32_t perf_held;   /* ISR: the effects held (PF_*) */
++static volatile uint32_t dfd_live_fx; /* main: Dark Funk Durcal's LIVE page: the effects and mutes it holds (dfd.c) */
+ static volatile uint8_t perf_latch_on;   /* main: MENU > FX LATCH ON (#40): a key with FX toggles its effect */
+ static volatile uint32_t perf_latched;   /* ISR: the effects latched (FX LATCH; main clears it: OCT-, the menu) */
+ static volatile uint32_t perf_act;    /* ISR: .. running (a 1/16 one from its start on) */
+@@ -298,7 +299,7 @@ static void perf_buf_select(uint32_t e)
+  * Returns 1 when a stage has something to do */
+ static __attribute__((noinline)) int perf_begin(uint32_t n)
+ {
+-    uint32_t held = perf_kill ? 0u : (perf_held | perf_latched | (perf_solo ? (~(uint32_t)perf_solo & 15u) << PF_M1 : 0u)) & perf_avail();
++    uint32_t held = perf_kill ? 0u : (perf_held | perf_latched | dfd_live_fx | (perf_solo ? (~(uint32_t)perf_solo & 15u) << PF_M1 : 0u)) & perf_avail();
+     uint32_t q, k, ph0, bnd;
+     int32_t m;
+     if (!held && !pf.busy && !(perf_k[0] | perf_k[1] | perf_k[2])) {   /* idle: the clock only */
+diff --git a/firmware/src/project.c b/firmware/src/project.c
+index d267cd1..08918fe 100644
+--- a/firmware/src/project.c
++++ b/firmware/src/project.c
+@@ -290,6 +290,8 @@ static void proj_drums_to_part(project_t *q)
+     d->preset = PROJ_DEF_KEEP;
+     d->p[P_LEVEL] = (int16_t)clamp(q->g[G_DRLVL], 0, 127);   /* the drum part's level and reverb send */
+     d->p[P_REV] = (int16_t)clamp(q->g[G_DRREV], 0, 127);
++    q->g[G_DRLVL] = 0;                          /* (now the TAPE ECHO's HEADS and WOW: params.c) */
++    q->g[G_DRREV] = 0;
+     q->parts = NPART;
+     q->sum = proj_sum(q);
+ }
+diff --git a/firmware/src/ui.c b/firmware/src/ui.c
+index e63d369..b344a16 100644
+--- a/firmware/src/ui.c
++++ b/firmware/src/ui.c
+@@ -39,6 +39,15 @@ static uint32_t user_of(const track_t *t)    /* user preset slot its sound came
+     return t->user && up_used(t->user - 1u) ? t->user - 1u : UP_SLOTS;
+ }
+ static uint32_t up_gen;                      /* bumped on every user bank change (redraws) */
++/* Dark Funk Durcal's pages (dfd.c, included after the UI) */
++static int dfd_page(uint32_t g);
++static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps);
++static void dfd_oct(void);
++static const char *dfd_act_name(void);
++static void dfd_graph(uint32_t g);
++static void dfd_columns(uint32_t g);
++static uint32_t dfd_sig(void);
++static void dfd_home_eye(void);
+ #include "favorites.c"
+ #include "category.c"                   /* sound categories (Discussion #90): PRESETS > LIST */
+ /* MENU's two-valued settings (ui_menu.c MENU_FLAGS), a bit each in a byte no engine uses (as ui_layer.c layer_seen):
+@@ -1778,6 +1787,7 @@ static uint32_t act_cols(void)                   /* the columns that are actions
+     if (ui.home)
+         return 0;
+     if (pg->graph == GR_EVENTS) return 16u;     /* AUTOMATION: no knob is an action; OCT+ by the row (ev_oct) */
++    if (dfd_page(pg->graph)) return 16u;        /* Dark Funk Durcal: OCT+ SUMMON / MAKE / ROLL ALL / APPLY (dfd.c) */
+     if (pg->graph == GR_TOOLS) return 15u;
+     if (pg->graph == GR_SONG)
+         return 1u;                               /* PLAY / STOP (also the PLAY button) */
+@@ -1801,6 +1811,7 @@ static uint32_t act_col(void)
+ {
+     if (!ui.home && cur_page()->graph == GR_SONG) return 1u;
+     if (!ui.home && cur_page()->graph == GR_EVENTS) return 5u;
++    if (!ui.home && dfd_page(cur_page()->graph)) return 5u;
+     return !ui.home && cur_page()->graph == GR_PATS ? 2u : ui.act;
+ }
+ 
+@@ -1809,6 +1820,7 @@ static const char *act_name(uint32_t c)          /* column c's action (the foote
+     static const char *const UP_GO[3] = {"LOAD", "ERASE", "SAVE"};
+     uint32_t id = cur_page()->id[c & 3u];
+     if (cur_page()->graph == GR_EVENTS) return ev_act_name();
++    if (dfd_page(cur_page()->graph)) return dfd_act_name();
+     if (cur_page()->graph == GR_TOOLS) {
+         static const char *const actions[] = {"CLEAR", "INIT", "DELETE", "CLEAR"};
+         return (c & 3u) == 1u && ui.tl_clean ? "CLEAN" : actions[c & 3u];   /* (1.5.5: KNOB 2 on: CLEAN INIT) */
+@@ -1834,6 +1846,7 @@ static int act_ready(void)
+     if (!c--)
+         return 0;
+     if (cur_page()->graph == GR_EVENTS) return ev_act_ready();
++    if (dfd_page(cur_page()->graph)) return !chain_busy() || cur_page()->graph == GR_DFD_LIVE;
+     if (cur_page()->graph == GR_TOOLS)                  /* one case per column: CLEAR PAT, INIT, DELETE ROW, CLEAR SONG */
+         return !chain_busy() && (c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u ? 1 :
+                                  c == 2u ? ui.song_row < chain_config.count : chain_config.count != 0u);
+diff --git a/firmware/src/ui_draw.c b/firmware/src/ui_draw.c
+index 762d5a9..2f24680 100644
+--- a/firmware/src/ui_draw.c
++++ b/firmware/src/ui_draw.c
+@@ -992,6 +992,10 @@ static void draw_columns(void)
+         }
+         return;
+     }
++    if (dfd_page(cur_page()->graph)) {                 /* Dark Funk Durcal (dfd.c) */
++        dfd_columns(cur_page()->graph);
++        return;
++    }
+     if (cur_page()->graph == GR_SONG) {             /* SECTION, TRACK, its PAT (A..D, -), REPS (the section's) */
+         uint32_t row = ui.song_row < CHAIN_ROWS ? ui.song_row : CHAIN_ROWS - 1u, k = ui.song_trk % NTRK, sl;
+         int used = row < chain_config.count;
+@@ -1386,6 +1390,173 @@ static void draw_splash(void)
+     lcd_sync();
+ }
+ 
++
++/* ===================================================================== DARK FUNK DURCAL
++ * The animated eye splash (Dark Funk Durcal Synt, based on Felucca 1.8.2): after the Felucca credit square,
++ * main.c draws it frame by frame for DFD_SPLASH_MS: dots, the ring, the triangle, the tendrils grow, the eye
++ * opens, the title is typed and the music line fades in. Canvas only (two bands: 240 x 124 and 240 x 110),
++ * integer maths, bounded loops. Not with MENU > ANIM OFF or after a crash (main.c). */
++#define DFD_SPLASH_MS 4400u
++static const int16_t DFD_SIN[256] = {0,402,804,1205,1606,2006,2404,2801,3196,3590,3981,4370,4756,5139,5520,5897,6270,6639,7005,7366,7723,8076,8423,8765,9102,9434,9760,10080,10394,10702,11003,11297,11585,11866,12140,12406,12665,12916,13160,13395,13623,13842,14053,14256,14449,14635,14811,14978,15137,15286,15426,15557,15679,15791,15893,15986,16069,16143,16207,16261,16305,16340,16364,16379,16384,16379,16364,16340,16305,16261,16207,16143,16069,15986,15893,15791,15679,15557,15426,15286,15137,14978,14811,14635,14449,14256,14053,13842,13623,13395,13160,12916,12665,12406,12140,11866,11585,11297,11003,10702,10394,10080,9760,9434,9102,8765,8423,8076,7723,7366,7005,6639,6270,5897,5520,5139,4756,4370,3981,3590,3196,2801,2404,2006,1606,1205,804,402,0,-402,-804,-1205,-1606,-2006,-2404,-2801,-3196,-3590,-3981,-4370,-4756,-5139,-5520,-5897,-6270,-6639,-7005,-7366,-7723,-8076,-8423,-8765,-9102,-9434,-9760,-10080,-10394,-10702,-11003,-11297,-11585,-11866,-12140,-12406,-12665,-12916,-13160,-13395,-13623,-13842,-14053,-14256,-14449,-14635,-14811,-14978,-15137,-15286,-15426,-15557,-15679,-15791,-15893,-15986,-16069,-16143,-16207,-16261,-16305,-16340,-16364,-16379,-16384,-16379,-16364,-16340,-16305,-16261,-16207,-16143,-16069,-15986,-15893,-15791,-15679,-15557,-15426,-15286,-15137,-14978,-14811,-14635,-14449,-14256,-14053,-13842,-13623,-13395,-13160,-12916,-12665,-12406,-12140,-11866,-11585,-11297,-11003,-10702,-10394,-10080,-9760,-9434,-9102,-8765,-8423,-8076,-7723,-7366,-7005,-6639,-6270,-5897,-5520,-5139,-4756,-4370,-3981,-3590,-3196,-2801,-2404,-2006,-1606,-1205,-804,-402};
++#define DFD_S(a) ((int32_t)DFD_SIN[(uint32_t)(a) & 255u])
++#define DFD_C(a) ((int32_t)DFD_SIN[((uint32_t)(a) + 64u) & 255u])
++static uint32_t dfd_isqrt(uint32_t v)
++{
++    uint32_t r = 0, b = 1u << 30;
++    while (b > v)
++        b >>= 2;
++    while (b) {
++        if (v >= r + b) { v -= r + b; r = (r >> 1) + b; }
++        else r >>= 1;
++        b >>= 2;
++    }
++    return r;
++}
++static int32_t dfd_ease(int32_t t, int32_t t0, int32_t len)       /* 0..256, eased out */
++{
++    int32_t u;
++    if (t <= t0) return 0;
++    if (t >= t0 + len) return 256;
++    u = 256 - (t - t0) * 256 / len;
++    return 256 - u * u / 256 * u / 256;
++}
++static void dfd_dot(int32_t x, int32_t y, int32_t th, uint16_t c)
++{
++    cv_rect(x - th / 2, y - th / 2, th, th, c);
++}
++static void dfd_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t th, uint16_t c)
++{
++    int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
++    int32_t dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
++    int32_t err = dx + dy, guard = 600;
++    while (guard--) {
++        int32_t e2 = 2 * err;
++        dfd_dot(x0, y0, th, c);
++        if (x0 == x1 && y0 == y1) break;
++        if (e2 >= dy) { err += dy; x0 += sx; }
++        if (e2 <= dx) { err += dx; y0 += sy; }
++    }
++}
++static void dfd_disc(int32_t cx, int32_t cy, int32_t r, uint16_t c)
++{
++    int32_t dy;
++    for (dy = -r; dy <= r; dy++) {
++        int32_t w = (int32_t)dfd_isqrt((uint32_t)(r * r - dy * dy));
++        cv_rect(cx - w, cy + dy, 2 * w + 1, 1, c);
++    }
++}
++/* an arc of the circle from the top, `upto` of 256, dashed when dash */
++static void dfd_ring(int32_t cx, int32_t cy, int32_t r, int32_t upto, int32_t dash, int32_t rot, int32_t th, uint16_t c)
++{
++    int32_t i;
++    for (i = 0; i < upto && i < 256; i += 4) {
++        int32_t a = i - 64 + rot;
++        if (dash && ((i >> 3) & 1)) continue;
++        dfd_line(cx + r * DFD_C(a) / 16384, cy + r * DFD_S(a) / 16384, cx + r * DFD_C(a + 4) / 16384,
++                 cy + r * DFD_S(a + 4) / 16384, th, c);
++    }
++}
++static void dfd_text_c(int32_t y, const aafont_t *f, const char *s, uint16_t fg, uint16_t bg)
++{
++    int32_t w = text_w(f, s);
++    cv_text_on((240 - w) / 2, y, f, s, fg, bg);
++}
++static __attribute__((unused)) void draw_splash_frame(uint32_t tms)
++{
++    int32_t t = (int32_t)tms, cx = 120, cy = 62, r = 42, k, side;
++    int32_t ring = dfd_ease(t, 150, 650), tri = dfd_ease(t, 450, 700), grow = dfd_ease(t, 700, 800);
++    int32_t open = dfd_ease(t, 1250, 450), flash = t > 1550 && t < 2100 ? (2100 - t) * 256 / 550 : 0;
++    uint16_t bone = T_TEXT, bg = T_BG, faint = ux_mix(T_BG, T_TEXT, 30), red = T_REC;
++    /* ------------------------------------------------ band 1: the sigil and the eye (240 x 124 at y 4) */
++    cv_begin(240, 124, bg);
++    if (flash > 0)
++        dfd_disc(cx, cy, r + 10 + flash / 32, ux_mix(T_BG, T_TEXT, 6 + flash / 40));
++    for (k = 0; k < 18 && k * 70 < t; k++) {                             /* the dots */
++        int32_t a = k * 256 / 18 - 64, rr = r + 18;
++        dfd_dot(cx + rr * DFD_C(a) / 16384 * 3 / 2, cy + rr * DFD_S(a) / 16384, k % 3 ? 2 : 4, faint);
++    }
++    if (grow > 0)                                                         /* the tendrils, tapered */
++        for (side = -1; side <= 1; side += 2)
++            for (k = 0; k < 5; k++) {
++                int32_t y0 = (k - 2) * 15, len = (68 - (k == 2 ? 0 : 8) - (k == 0 || k == 4 ? 10 : 0)) * grow / 256, j, px = 0, py = 0;
++                for (j = 0; j <= 10; j++) {
++                    int32_t u = j * 256 / 10, x = cx + side * (r + 6 + len * j / 10);
++                    int32_t wob = DFD_S(j * 20 + (t >> 3) + k * 40) * 4 * u / 256 / 16384;
++                    int32_t y = cy + y0 * (128 + u / 2) / 192 + wob, th = 5 - (j * 4) / 10 - (k == 2 ? 0 : 1);
++                    if (th < 1) th = 1;
++                    if (j) dfd_line(px, py, x, y, th, k == 2 ? bone : faint);
++                    px = x; py = y;
++                }
++            }
++    dfd_disc(cx, cy, r - 1, bg);
++    dfd_ring(cx, cy, r + 6, ring, 1, t / 40, 3, bone);                  /* the dashed outer ring, turning */
++    dfd_ring(cx, cy, r - 2, ring, 0, 0, 1, faint);
++    if (tri > 0) {                                                        /* the triangle, drawn side by side */
++        int32_t P[4][2] = {{cx, cy - r + 1}, {cx + r * 87 / 100, cy + r / 2}, {cx - r * 87 / 100, cy + r / 2}, {cx, cy - r + 1}};
++        int32_t done = tri * 3, s2;
++        for (s2 = 0; s2 < 3 && done > 0; s2++) {
++            int32_t u = done > 256 ? 256 : done;
++            dfd_line(P[s2][0], P[s2][1], P[s2][0] + (P[s2 + 1][0] - P[s2][0]) * u / 256,
++                     P[s2][1] + (P[s2 + 1][1] - P[s2][1]) * u / 256, 3, bone);
++            done -= 256;
++        }
++    }
++    {   /* the eye: lids (two parabolas), the iris and pupil inside them */
++        int32_t W = 26, H = 1 + 15 * open / 256, x, y;
++        int32_t ix = cx + (open > 200 ? (DFD_S(t >> 4) * 4 / 16384) : 0), ir = 10, pr = 4 + flash / 64;
++        for (y = -ir; y <= ir; y++)                                       /* the iris, clipped by the lids */
++            for (x = -ir; x <= ir; x++) {
++                int32_t d2 = x * x + y * y, ax = ix + x - cx, lim;
++                if (d2 > ir * ir) continue;
++                if (ax < -W || ax > W) continue;
++                lim = H * (W * W - ax * ax) / (W * W);
++                if (y > lim || y < -lim) continue;
++                cv_pset(ix + x, cy + y, d2 > (ir - 2) * (ir - 2) ? bone : (d2 <= pr * pr ? (d2 <= 2 ? bg : bone) : (flash > 64 ? red : bg)));
++            }
++        for (x = -W; x < W; x += 2) {                                     /* the lids */
++            int32_t y0 = H * (W * W - x * x) / (W * W), y1 = H * (W * W - (x + 2) * (x + 2)) / (W * W);
++            dfd_line(cx + x, cy - y0, cx + x + 2, cy - y1, 2, bone);
++            dfd_line(cx + x, cy + y0, cx + x + 2, cy + y1, 2, bone);
++        }
++        if (t > 1700) {                                                   /* the drop below the eye */
++            int32_t dyy = cy + r / 2 + 8 + (t > 2000 ? (t - 2000) / 150 : 0);
++            dfd_disc(cx, dyy, 3, bone);
++            dfd_line(cx, dyy - 6, cx, dyy - 2, 2, bone);
++        }
++    }
++    cv_blit(0, 4);
++    /* ------------------------------------------------ band 2: the words (240 x 110 at y 130) */
++    cv_begin(240, 110, bg);
++    if (t > 1500) {
++        static const char TITLE[] = "DARK FUNK DURCAL";
++        char b[20];
++        int32_t n = (t - 1500) / 45, i;
++        if (n > 16) n = 16;
++        for (i = 0; i < n; i++) b[i] = TITLE[i];
++        b[n] = 0;
++        cv_text_on((240 - text_w(&AF_M, TITLE)) / 2, 2, &AF_M, b, bone, bg);
++    }
++    if (t > 2150)
++        dfd_text_c(22, &AF_M, "S Y N T", t > 2300 ? bone : faint, bg);
++    if (t > 2250 && t < 3500) {                       /* what is it: the music, everywhere */
++        uint16_t c = t > 2450 ? ux_mix(T_BG, T_TEXT, 75) : faint;
++        cv_rect(40, 43, 160, 1, faint);
++        dfd_text_c(50, &AF_S, "WHAT IS DARK FUNK DURCAL?", t > 2450 ? bone : faint, bg);
++        dfd_text_c(66, &AF_S, "SEARCH IT ON SPOTIFY, YOUTUBE", c, bg);
++        dfd_text_c(80, &AF_S, "AND EVERY AUDIO PLATFORM", c, bg);
++    }
++    if (t >= 3500) {                                  /* who made it */
++        uint16_t c = t > 3700 ? bone : faint;
++        cv_rect(40, 43, 160, 1, faint);
++        dfd_text_c(48, &AF_S, "CREATED AT POLARIS SOUND LAB", c, bg);
++        dfd_text_c(63, &AF_S, "MERIDA, YUCATAN, MEXICO", t > 3700 ? ux_mix(T_BG, T_TEXT, 70) : faint, bg);
++        dfd_text_c(80, &AF_S, "INSTAGRAM @polaris.sound.lab", t > 3700 ? red : faint, bg);
++        dfd_text_c(95, &AF_S, "YOUTUBE @PolarisSoundLab", t > 3700 ? red : faint, bg);
++    }
++    cv_blit(0, 130);
++    lcd_sync();
++}
++
+ /* UPDATE MODE countdown (main.c: OCT- + OCT+ held): over everything, the menu and the dialogs too */
+ static void draw_uboot(void)
+ {
+diff --git a/firmware/src/ui_graph.c b/firmware/src/ui_graph.c
+index 0ae1efb..a1cf7ec 100644
+--- a/firmware/src/ui_graph.c
++++ b/firmware/src/ui_graph.c
+@@ -1138,6 +1138,8 @@ static uint32_t strip_kind(void)
+     if (ui.home)
+         return SK_SCOPE;
+     g = cur_page()->graph;
++    if (dfd_page(g))                                 /* Dark Funk Durcal: the eye and the dice keep their strip */
++        return SK_NONE;                              /* (dfd_graph draws itself small in LG_H_GRAPH) */
+     return g == GR_ADSR ? SK_ADSR : g == GR_LFO ? SK_LFO : g == GR_TRK ? SK_TRK : SK_TITLE;
+ }
+ /* the page's title and its number in its family ("ENV DEST 2/2", EDIT: the engine's "OSC 1/2"); the piano roll: its
+@@ -1193,6 +1195,7 @@ static uint32_t graph_signature(void)
+     if (strip_kind() == SK_TITLE)                    /* MENU > LARGE: the page's title (its engine, its number) */
+         return h ^ 0x5A17u;
+     if (pg->graph == GR_NONE || pg->graph == GR_ARP) h ^= ui.frame / 2u;
++    if (dfd_page(pg->graph)) h ^= ui.frame / 2u + dfd_sig() * 7u;   /* Dark Funk Durcal: the eye moves */
+     for (i = 0; i < P_COUNT; i++)
+         h = (h ^ (uint32_t)t->p[i]) * 16777619u;
+     h ^= (uint32_t)TSEL->preset * 7u + (uint32_t)song.g[G_SLOT] * 13u + TSEL->user * 257u + up_gen * 7919u + ui.uslot * 104729u +
+@@ -2257,7 +2260,10 @@ static void draw_graph(void)
+         uint32_t k = strip_kind();
+         cv_oy = k == SK_ADSR || k == SK_LFO ? 3 : 0;
+         graph_ht = LG_H_GRAPH - 6;
+-        if (k == SK_SCOPE) graph_scope(c);
++        if (k == SK_SCOPE) {
++            graph_scope(c);
++            if (ui.home) dfd_home_eye();             /* Dark Funk Durcal: the eye on HOME, LARGE too */
++        }
+         else if (k == SK_ADSR) graph_adsr(t, c);
+         else if (k == SK_LFO) graph_lfo(t, c);
+         else graph_title();
+@@ -2265,6 +2271,7 @@ static void draw_graph(void)
+     } else if (ui.home) {
+         cv_oy = 0;
+         graph_scope(c);
++        dfd_home_eye();                              /* Dark Funk Durcal: the eye on HOME (dfd.c) */
+     } else {
+         switch (pg->graph) {
+         case GR_ADSR:
+@@ -2330,6 +2337,15 @@ static void draw_graph(void)
+             cv_oy = 0;
+             panel_note("TURN TO PICK", "[OCT+] CONFIRM", 0);
+             break;
++        case GR_DFD_RITUAL:
++        case GR_DFD_MELODY:
++        case GR_DFD_DICE:
++        case GR_DFD_STRETCH:
++        case GR_DFD_LIVE:
++        case GR_DFD_NEXT:
++            cv_oy = 0;
++            dfd_graph(pg->graph);
++            break;
+ #if FELUCCA_SLICE
+         case GR_SLICES:
+             cv_oy = 0;
+diff --git a/firmware/src/ui_help.c b/firmware/src/ui_help.c
+index 0cdd918..41fc85b 100644
+--- a/firmware/src/ui_help.c
++++ b/firmware/src/ui_help.c
+@@ -24,7 +24,8 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
+     {"SLICER", "[K1]ON[K2]PATTERN[FX]INSERT"},
+     {"INSERT", "[K1]TYPE[FX]DRY / WET"},
+     {"INSERT 2", "[K1]DRY / WET[FX]DLY"},
+-    {"DLY", "[K1-4]ALL TRACKS[FX]REVERB"},
++    {"DLY", "[K1-4]ALL TRACKS[FX]TAPE ECHO"},
++    {"TAPE ECHO", "[K1]HEADS[K2]WOW[FX]REVERB"},
+     {"REVERB", "[K1]ROOM SPRING HALL[FX]CHORUS"},
+     {"CHORUS", "[K1-4]ALL TRACKS[FX]FX"},
+     {"SCL", "[K2]SCALE[K3]QUANTIZE[SCL]CHORDS"},
+@@ -54,6 +55,12 @@ static const struct { const char *title, *hint; } HELP_PAGE[] = {
+     {"AUTOMATION", "[K1]ROW[OCT+]DO[EDIT]DELETE"},
+     {"MIXER", "[K4]MUTE[ALGO]TRACK[HOME]CLOCK"},
+     {"CLOCK", "[SELECT]TEMPO[GLO]HOLD: TAP"},
++    {"RITUAL", "[K1-4]STYLES[OCT+]SUMMON"},
++    {"MELODY", "[K3]SHAPE[OCT+]MAKE MELODY"},
++    {"DICE", "[K1-4]ROLL[OCT+]ROLL ALL"},
++    {"STRETCH", "[K2]STRETCH[OCT+]APPLY"},
++    {"LIVE", "[K1]MUTES[K2]REPEAT[OCT+]DROP"},
++    {"NEXT", "[K1]PHRASE 1-3[OCT+]KEEP"},
+ };
+ #define H_HOME "[PRESETS]SOUND[HOME]HOLD: MENU"
+ #define H_LEVELS "[K1-4]T1-T4 LEVEL[HOME]MIXER"
+diff --git a/firmware/src/ui_input.c b/firmware/src/ui_input.c
+index 5d181cf..3ba912c 100644
+--- a/firmware/src/ui_input.c
++++ b/firmware/src/ui_input.c
+@@ -1008,6 +1008,10 @@ static void edit_param(uint32_t slot, int32_t steps)
+         tracks_edit(slot, steps);
+         return;
+     }
++    if (dfd_page(pg->graph)) {                            /* Dark Funk Durcal's pages (dfd.c) */
++        dfd_knob(pg->graph, slot, steps);
++        return;
++    }
+     if (pg->graph == GR_BROWSE) {                         /* KNOB 1: one preset, KNOB 2: the next / previous engine */
+         if (slot == 0u) {
+             preset_step(steps);
+@@ -1084,6 +1088,10 @@ static void edit_param(uint32_t slot, int32_t steps)
+ static void act_do(void)
+ {
+     uint32_t c = act_col(), id, k = (uint32_t)song.g[G_SLOT] - 1u;
++    if (dfd_page(cur_page()->graph)) {                    /* Dark Funk Durcal (dfd.c) */
++        dfd_oct();
++        return;
++    }
+     if (!c--)
+         return;
+     if (cur_page()->graph == GR_EVENTS) {
+diff --git a/tests/golden.txt b/tests/golden.txt
+index 9e7f299..6e5762a 100644
+--- a/tests/golden.txt
++++ b/tests/golden.txt
+@@ -12,6 +12,16 @@ preset/ANALOG/08_PLUCK a8060629ca06fb68
+ preset/ANALOG/09_BRASS 5687cf7b6f558044
+ preset/ANALOG/10_WIND 8a038e70ab813a10
+ preset/ANALOG/11_STRINGS 978e9d31de7cab88
++preset/ANALOG/12_DFD_ACID fe1b03c542d42f08
++preset/ANALOG/13_SQUELCH a2a328ca23113104
++preset/ANALOG/14_BLACK_ACID 254707332f8f3c40
++preset/ANALOG/15_RUBBER_ACID 9a0d58e70fca6fb8
++preset/ANALOG/16_SERPENT ffd2850e5c06ea60
++preset/ANALOG/17_ACID_LASER 4be8054034f9e660
++preset/ANALOG/18_ACID_2 278b3f70cf432ac4
++preset/ANALOG/19_REESE 387af8d312c18aa4
++preset/ANALOG/20_DETUNE_PAD c90bdd09f19c5ab4
++preset/ANALOG/21_BRAIN_LEAD 68a1da22cf93a6c8
+ preset/PHASE/00_BRASS 36d318d48984648c
+ preset/PHASE/01_ORGAN b856dd588dba78a0
+ preset/PHASE/02_STRING 8b106b798f1afc04
+diff --git a/tests/project_test.c b/tests/project_test.c
+index 2c285d2..d058f2c 100644
+--- a/tests/project_test.c
++++ b/tests/project_test.c
+@@ -196,8 +196,8 @@ int main(void)
+     bad += check("FUN2 -> FUN6: converted, valid format 5 slot", ok && proj_ok(&q) && q.magic == PROJ_MAGIC);
+     ok = q.sel == 2;
+     for (i = 0; i < G_COUNT; i++)
+-        ok &= q.g[i] == (i == G_RTYPE ? 0 : (int16_t)(500 + i));
+-    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM) and selected track", ok);
++        ok &= q.g[i] == (i == G_RTYPE || i == G_DRLVL || i == G_DRREV ? 0 : (int16_t)(500 + i));
++    bad += check("FUN2 -> FUN6: globals (id 24, the old drum channel: ROOM; 25 26 Dark Funk Durcal's TAPE ECHO: OFF) and selected track", ok);
+     ok = 1;
+     for (t = 0; t < NTRK; t++)
+         ok &= track_ok(&q.t[t], &v2.t[t], t, t == 3u, 127, 127);   /* (G_DRLVL / G_DRREV 525 / 526: 127) */
+diff --git a/tests/run_tests.sh b/tests/run_tests.sh
+index cb93324..5cd016e 100755
+--- a/tests/run_tests.sh
++++ b/tests/run_tests.sh
+@@ -203,7 +203,7 @@ mkdir -p "$OUT"
+ HALI="-Ifirmware/hal -Ifirmware/bsp/chip -Ifirmware/bsp/boards/fm1 -Ifirmware/src"   # (src: uac_fir.h, which bsp/chip/usb.c includes)
+ CC="${CC:-cc} -O1 -Wall -Wno-unused-function $HALI"
+ fail=0
+-run() { echo "== $1"; shift; "$@" || fail=1; }
++run() { echo "== $1"; n="$1"; shift; "$@" || { fail=1; echo "SECTION FAILED: $n"; }; }
+ 
+ $CC -o "$OUT/storage_test" tests/storage_test.c
+ $CC -Ibuild/gen -Ifirmware/src -o "$OUT/signed_audio_scaling_test" tests/signed_audio_scaling_test.c -lm
+@@ -303,7 +303,7 @@ if [ -f build/gen/felucca_tables.h ]; then
+     run "1.2 (FUN10): LFO 2 SYNC / TRIG / POL, NUDGE (record, QUANTIZE, play, controls), 128 motion records, FUN10 / FUN9 / FUN8 / FUN7, user presets" "$OUT/fun10_test"
+     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_drift_test" tests/midi_drift_test.c -lm
+     run "External-clock long-run phase: five 20-minute USB/TRS cases" "$OUT/midi_drift_test"
+-    $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
++    $CC -O1 -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/midi_control_test" tests/midi_control_test.c -lm
+     run "USB/TRS clock, bend, sustain, ownership and panic recovery" "$OUT/midi_control_test"
+     $CC -O1 -w -DTIMER5_SYNTH_TEST=1 -Ibuild/gen -Ifirmware/src -o "$OUT/timer5_cc_clock_test" tests/timer5_midi_test.c -lm
+     run "TRS clock and four sequencers under saturated learned CCs (full upstream map)" "$OUT/timer5_cc_clock_test"
+@@ -358,12 +358,12 @@ if [ -f build/gen/felucca_tables.h ]; then
+     run "persistence: deferred settings, retry and failed-save rollback" "$OUT/persistence_test"
+     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/backup_test" tests/backup_test.c -lm
+     run "full backup: CRC before writes, stale runtime, USB reset / timeout, malformed objects, older projects" "$OUT/backup_test"
+-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
++    $CC -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/fm6bank_test" tests/fm6bank_test.c -lm
+     run "FM6 voice bank (1.4.1): write / read, power cuts, CRC, SLOT B1..B32, stored SLOT values as before" "$OUT/fm6bank_test"
+-    $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
++    $CC -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test" tests/editor_test.c -lm
+     run "editor: real C protocol, malformed transfers, queue recovery, MENU settings (writes build/host/menu.json)" \
+         env MENU_JSON="$OUT/menu.json" "$OUT/editor_test"
+-    $CC -w -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test_c1" tests/editor_test.c -lm
++    $CC -w -DDFD_NO_BANK -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/editor_test_c1" tests/editor_test.c -lm
+     run "editor, a FELUCCA_CPU2=0 build: MENU settings without 2ND CORE (ids 0..31)" "$OUT/editor_test_c1"
+     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/robust_test" tests/robust_test.c -lm
+     run "robustness: crafted sample slots, engine numbers, retained old projects, preset patterns, malformed requests" \
+@@ -398,6 +398,9 @@ if [ -f build/gen/felucca_tables.h ]; then
+     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/reverb_test" tests/reverb_test.c -lm
+     mkdir -p build/reverb_demo
+     run "REVERB TYPE: ROOM / SPRING bit-identical, SPRING and HALL decay / stability / level, HALL silence / stereo / ringing, model changes, cost, demos" "$OUT/reverb_test" build/fx_demo build/reverb_demo
++    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/tape_test" tests/tape_test.c -lm
++    mkdir -p build/tape_demo
++    run "TAPE ECHO (Dark Funk Durcal): OFF untouched, every HEADS x WOW bounded, heads' times, mode changes, demos" "$OUT/tape_test" build/tape_demo
+     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
+     run "regression: golden renders, health, voices, CPU budget (2ND CORE OFF: one core)" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
+     $CC -O2 -w -DFELUCCA_CPU2=0 -Ibuild/gen -Ifirmware/src -o "$OUT/regress_cpu2_0" tests/regress.c -lm
+@@ -462,7 +465,7 @@ if [ -f build/gen/felucca_tables.h ]; then
+     $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/noise_test" tests/noise_test.c -lm
+     mkdir -p build/noise_demo
+     run "NOISE: colour slopes, key-tracked filter and clock, META period, DC, clipping, retrigger, cost, demos" "$OUT/noise_test" build/noise_demo
+-    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_test" tests/fm6_test.c -lm
++    $CC -O2 -w -DDFD_NO_BANK -Ibuild/gen -Ifirmware/src -o "$OUT/fm6_test" tests/fm6_test.c -lm
+     mkdir -p build/fm6_demo
+     run "FM6: algorithms, envelopes, retrigger, DC, clipping, macros, patch formats, voices, cost, demos" "$OUT/fm6_test" build/fm6_demo
+     # SLICE is in the standard build (firmware/src/core.h): its test always runs (after #22 by andreahaku)
+@@ -523,7 +526,7 @@ else
+     $SCC -DOWN_PKG=1 -o "$A/ota_test" tests/ota_test.c
+     run "ASan/UBSan: M-UPGRADE entry (own loader)" "$A/ota_test" build/felucca.fwsc
+     for t in editor_test project_test backup_test robust_test fun10_test fm6bank_test midi_drift_test; do
+-        $SCC -o "$A/$t" tests/$t.c -lm
++        $SCC $(case $t in editor_test|fm6bank_test) echo -DDFD_NO_BANK;; esac) -o "$A/$t" tests/$t.c -lm
+         run "ASan/UBSan: $t" "$A/$t"
+     done
+     $SCC -DTIMER5_SYNTH_TEST=1 -o "$A/timer5_cc_clock_test" tests/timer5_midi_test.c -lm
+diff --git a/tests/settings_test.c b/tests/settings_test.c
+index c44636a..d5c02d2 100644
+--- a/tests/settings_test.c
++++ b/tests/settings_test.c
+@@ -45,7 +45,7 @@ int main(void)
+         /* 1.0.2: the old MONO keeps its id as GREY (a saved MONO looks the same); the new black and white MONO is
+          * appended, a new id */
+         assert(palette_from_stored(UI_PAL_TAG + 0u) == UI_GREY_INDEX && !strcmp(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
+-        assert(UI_BW_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
++        assert(UI_BW_INDEX == NPALETTES - 2u && UI_DURCAL_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
+                palette_from_stored(UI_PAL_TAG + UI_BW_INDEX) == UI_BW_INDEX && palette_stored_ok(UI_PAL_TAG + UI_BW_INDEX));
+         q.palette = palette_to_stored(5);
+         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 5u);
 diff --git a/tests/tape_test.c b/tests/tape_test.c
 new file mode 100644
 index 0000000..86192fb
@@ -2216,3 +2171,293 @@ index 0000000..86192fb
 +    printf(fails ? "tape test FAILED (%d)\n" : "tape test passed\n", fails);
 +    return fails != 0;
 +}
+diff --git a/tests/theme_test.c b/tests/theme_test.c
+index d4d3d33..6ac2c08 100644
+--- a/tests/theme_test.c
++++ b/tests/theme_test.c
+@@ -47,7 +47,7 @@ int main(int argc, char **argv)
+     static const uint8_t pd[] = {0x08, 0xf0};
+     const aafont_t probe = {1, 1, 'A', 'A', 0, 0, pg, pd, 0, 0, 0};
+     double worst = 100;
+-    assert(NPALETTES == 10u && !strcmp(UI_PALETTES[0].name, "GREY") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
++    assert(NPALETTES == 11u && !strcmp(UI_PALETTES[10].name, "DURCAL") && UI_DURCAL_INDEX == 10u && !strcmp(UI_PALETTES[0].name, "GREY") && !strcmp(UI_PALETTES[7].name, "HI-CON") &&
+            !strcmp(UI_PALETTES[8].name, "NIGHT") && !strcmp(UI_PALETTES[9].name, "MONO") && UI_BW_INDEX == 9u);
+     /* (#50, 1.0.2: appended, the ids stay; GREY is the MONO of 1.0.1, id 0) */
+     for (unsigned st = ST_FLAT; st <= ST_LINE; st++) {   /* MONO: every token black or white (but its two colours), in FLAT and LINE */
+diff --git a/tests/ui155_test.c b/tests/ui155_test.c
+index fec7d0c..212ba8f 100644
+--- a/tests/ui155_test.c
++++ b/tests/ui155_test.c
+@@ -174,14 +174,22 @@ static int select_page(void)
+     ok = title_is("MIXER");
+     turn(EN_SELECT, 1);
+     ok &= title_is("CLOCK");
++    turn(EN_SELECT, 1);                                 /* Dark Funk Durcal: RITUAL MELODY DICE STRETCH after CLOCK */
++    ok &= title_is("RITUAL");
++    turn(EN_SELECT, 3);
++    ok &= title_is("STRETCH");
++    turn(EN_SELECT, 2);                                 /* dfd6: LIVE NEXT after STRETCH */
++    ok &= title_is("NEXT");
+     turn(EN_SELECT, 1);
+     ok &= ui.home;
+     turn(EN_SELECT, -1);
++    ok &= title_is("NEXT");
++    turn(EN_SELECT, -6);
+     ok &= title_is("CLOCK");
+     b0 = song.g[G_BPM];
+     turn(EN_K1, 1);
+     ok &= song.g[G_BPM] == b0 + 1;                      /* CLOCK's KNOB 1: the tempo */
+-    bad += check("  PAGE: HOME -> MIXER -> CLOCK -> HOME (as HOME's taps), back too; CLOCK's KNOB 1 still the tempo", ok);
++    bad += check("  PAGE: HOME -> MIXER -> CLOCK -> RITUAL .. STRETCH -> HOME (as HOME's taps), back too; CLOCK's KNOB 1 still the tempo", ok);
+ 
+     go_title("EDIT 1"); frame();
+     for (i = 0; i < 12u && ok; i++) {                   /* EDIT's pages: only the ones the engine shows */
+diff --git a/tests/ui_render.c b/tests/ui_render.c
+index 6563b2a..41a278c 100644
+--- a/tests/ui_render.c
++++ b/tests/ui_render.c
+@@ -803,7 +803,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
+        S_DETAIL, S_DETAIL_PLAYING, S_DETAIL_REST, S_DETAIL_DRUM, S_ROLL_MARKS, S_DRUM_MARKS, S_HELP_DETAIL,
+        S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
+        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
+-       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_COUNT };
++       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_DFD_RITUAL, S_DFD_MELODY, S_DFD_DICE, S_DFD_STRETCH, S_DFD_CALM, S_DFD_MID, S_DFD_FURY, S_DFD_HOME_FURY, S_DFD_TAPE, S_DFD_LIVE, S_DFD_NEXT, S_COUNT };
+ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
+     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
+     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
+@@ -834,7 +834,7 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
+     "detail_cond", "detail_fill", "auto_cond", "layer_glo_fill", "layer_seq_euclid", "layer_seq_euclid_drum",
+     "layer_seq_euclid_64",
+     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
+-    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold"};
++    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold", "dfd_ritual", "dfd_melody", "dfd_dice", "dfd_stretch", "dfd_eye_calm", "dfd_eye_mid", "dfd_eye_fury", "dfd_home_fury", "dfd_tape", "dfd_live", "dfd_next"};
+ 
+ /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
+  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
+@@ -1011,6 +1011,8 @@ static void setup(int s)
+     memset(kb_chn, 0, sizeof kb_chn);               /* no key held (roll_playing holds one) */
+     state();
+     memset(drum_mute, 0, sizeof drum_mute);          /* (1.4.1: no DRUM lane muted) */
++    dfd_ins_force = -1;
++    memset(&lv, 0, sizeof lv); dfd_live_fx = 0; perf_k[0] = 0; nx.on = 0; nx.pick = 0; nx.tgt = 3;
+     switch (s) {
+     case S_HOME: song.octave = 2; song.rec = 1; usb.config = 1; break;
+     case S_HOME_IDLE: song.playing = 0; song.batt_raw = 570; ui.hot_col = 1; ui.hot_t = 30; break;
+@@ -1255,6 +1257,17 @@ static void setup(int s)
+     }
+     case S_EDIT_GRAIN: eng(8); go_title("EDIT 2"); break;
+     case S_EDIT_PHYS: eng(9); go_title("EDIT 1"); break;
++    case S_DFD_RITUAL: go_title_page("RITUAL"); break;
++    case S_DFD_MELODY: go_title_page("MELODY"); break;
++    case S_DFD_DICE: go_title_page("DICE"); break;
++    case S_DFD_STRETCH: go_title_page("STRETCH"); break;
++    case S_DFD_CALM: dfd_ins_force = 10; go_title_page("RITUAL"); break;
++    case S_DFD_MID: dfd_ins_force = 128; go_title_page("RITUAL"); break;
++    case S_DFD_FURY: dfd_ins_force = 250; go_title_page("RITUAL"); break;
++    case S_DFD_HOME_FURY: dfd_ins_force = 250; go_home(); break;
++    case S_DFD_TAPE: song.g[G_DRLVL] = 7; song.g[G_DRREV] = 64; song.g[G_DFDBK] = 70; song.g[G_DMIX] = 60; go_title_page("TAPE ECHO"); break;
++    case S_DFD_LIVE: lv.mutes = 5; lv.rep = 2; lv.build = 60; lv.thr = 1; dfd_live_apply(); go_title_page("LIVE"); break;
++    case S_DFD_NEXT: dfd_summon(); nx.tgt = 3; nx_capture(); nx.pick = 1; nx_apply(); go_title_page("NEXT"); break;
+     case S_EDIT_PHASE_FOLD: eng(2); TSEL->p[P_E7] = 80; go_title("EDIT 2"); ui.hot_col = 3; ui.hot_t = 30; break;   /* 1.5.5 FOLD (#104) */
+     case S_ALG1: case S_ALG2: case S_ALG3: case S_ALG4: case S_ALG5: case S_ALG6: case S_ALG7: case S_ALG8:
+         eng(1); TSEL->p[P_E0] = (int16_t)(s - S_ALG1);      /* the 8 DIGITAL charts; FB on the odd ones, IDX high .. 0 */
+@@ -2261,7 +2274,19 @@ int main(int argc, char **argv)
+     const char *out = argc > 1 ? argv[1] : "build/ui_new";
+     char path[600];
+     uint32_t p, s;
+-    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT"};   /* (NIGHT: #50, to review) */
++    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT", "DURCAL"};   /* (DURCAL: the manual's pictures) */   /* (NIGHT: #50, to review) */
++    if (getenv("DFD_SPLASH")) {                      /* Dark Funk Durcal: the boot animation's frames, OUT/ppm/DURCAL_splash_<ms> */
++        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600};
++        char nm[32];
++        state();
++        pal(UI_DURCAL_INDEX);
++        for (p = 0; p < sizeof T / sizeof T[0]; p++) {
++            draw_splash_frame(T[p]);
++            snprintf(nm, sizeof nm, "splash_%u", (unsigned)T[p]);
++            write_ppm(out, "DURCAL", nm);
++        }
++        return 0;
++    }
+     snprintf(path, sizeof path, "%s/report.txt", out);
+     rep = fopen(path, "w");
+     if (!rep) { fprintf(stderr, "cannot write %s\n", path); return 1; }
+diff --git a/tests/ui_test.c b/tests/ui_test.c
+index 50f528c..0f988d8 100644
+--- a/tests/ui_test.c
++++ b/tests/ui_test.c
+@@ -155,6 +155,7 @@ static struct { uint32_t stage; } felucca_dbg;
+ #include "../firmware/src/ui_menu.c"
+ #include "../firmware/src/ui_input.c"
+ #include "../firmware/src/ui_layer.c"
++#include "../firmware/src/dfd.c"
+ #include "../firmware/src/upreset.c"
+ #include "../firmware/src/project.c"
+ 
+@@ -438,7 +439,7 @@ static int test_sound_loads(void)
+                  preset_pat_hint() == 12 && ui.ppick == 12 && str_eq(PATTERNS[12].name, "ARP"));
+     t->p[P_AMODE] = 2;
+     before = *t;
+-    for (i = 0; i < 6u; i++)                      /* several loads, into the next engine */
++    for (i = ENGINES[0]->npresets - t->preset; i; i--)   /* several loads, into the next engine (DFD: ANALOG has more) */
+         turn(EN_PRESET, 1);
+     bad += check("browsing on, into another engine: the steps still untouched", t->eng_req != before.eng_req &&
+                  !memcmp(t->step, before.step, sizeof t->step) && t->p[P_AMODE] == 2);
+@@ -1615,7 +1616,8 @@ static int test_display_preferences(void)
+                  settings.palette == 7 && (turn(EN_K1, 1), settings.palette == 8u) && T_BG == 0u &&
+                  str_eq(UI_PALETTES[8].name, "NIGHT") && (turn(EN_K1, 1), settings.palette == UI_BW_INDEX) &&
+                  str_eq(UI_PALETTES[UI_BW_INDEX].name, "MONO") && T_BG == 0u && T_TEXT == 0xFFFFu &&
+-                 (turn(EN_K1, 1), settings.palette == UI_GREY_INDEX) && str_eq(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
++                 (turn(EN_K1, 1), settings.palette == UI_DURCAL_INDEX) && str_eq(UI_PALETTES[UI_DURCAL_INDEX].name, "DURCAL") &&
++                 (turn(EN_K1, 1), settings.palette == UI_GREY_INDEX) && str_eq(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));   /* Dark Funk Durcal: DURCAL after MONO */
+     settings.lowcut = 2;
+     ui.menu_sel = MI_LOWCUT;
+     press(B_OCTUP);
+@@ -2776,7 +2778,7 @@ static int test_page_cycles(void)
+         uint32_t f = PAGES[i].fam;
+         ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
+         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
+-        ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK");   /* HOME's: MIXER CLOCK */
++        ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK") || dfd_page(PAGES[i].graph);   /* HOME's: MIXER CLOCK (+ DFD's) */
+         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
+         ui_power_on(); ui.home = 0; ui.page = (uint8_t)i; page_entered();
+         ok &= FAM_BTN[cur_fam()] == (f == FAM_TRK ? B_HOME : f == FAM_GLO ? B_GLO : f == FAM_SEQ ? B_SEQ :
+@@ -2953,13 +2955,19 @@ static int test_product_ux(void)
+         ok &= song.g[G_BPM] == bpm + 1 && song.g[G_SWING] == swg + 1 && song.g[G_CLOCK] != clk && song.g[G_TUNE] == tune;
+         song.g[G_CLOCK] = clk;
+     }
++    press(B_HOME);                                     /* Dark Funk Durcal: on to RITUAL MELODY DICE STRETCH, then HOME */
++    ok &= str_eq(cur_page()->title, "RITUAL");
++    press(B_HOME); press(B_HOME); press(B_HOME);
++    ok &= str_eq(cur_page()->title, "STRETCH");
++    press(B_HOME); press(B_HOME);                      /* dfd6: LIVE NEXT */
++    ok &= str_eq(cur_page()->title, "NEXT");
+     press(B_HOME);
+     ok &= ui.home && !ui.menu;
+     press(B_HOME);
+     ok &= cur_page()->graph == GR_TRK;
+     go_title("ENV"); press(B_HOME);
+     ok &= ui.home;
+-    go_title("CLOCK"); press(B_HOME);
++    go_title("NEXT"); press(B_HOME);
+     ok &= ui.home;
+     bad += check("1.2: HOME cycles HOME > MIXER > CLOCK > HOME (CLOCK: BPM SWG CLK, HOME's LED); from any other page HOME", ok);
+     hold(B_HOME);
+@@ -9222,6 +9230,7 @@ static int test_fm6_ops(void)
+     ok &= fm6_patch[tr][3u * FP_OP + FP_OL] == before[3u * FP_OP + FP_OL] - 7u &&
+           fm6_patch[tr][3u * FP_OP + FP_FF] == before[3u * FP_OP + FP_FF] && slot_own();
+     bad += check("FM6 ops: SAVE held undoes the gesture (patch and SLOT F5 back), again redoes; one undo per gesture", ok);
++    memset(&lv, 0, sizeof lv); dfd_live_fx = 0; perf_k[0] = 0;   /* (dfd6: the page sweep turned LIVE's knobs: its effects off) */
+ 
+     ok = 1;                                          /* every operator, every byte the pages edit: that byte only */
+     for (opn = 1; opn <= 6u; opn++)
+@@ -9663,6 +9672,7 @@ static int test_home_tracks(void)
+     bad += check("1.3 HOME > TRACKS: K1..K4 edit the selected track (HOME's four), ALGORITHM moves the selected row", ok);
+     press(B_HOME); ok = !ui.home && cur_page()->graph == GR_TRK;
+     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
++    press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME);   /* (Dark Funk Durcal's six pages) */
+     press(B_HOME); ok &= ui.home;
+     frame();
+     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;
+diff --git a/tools/build.py b/tools/build.py
+index b40a201..195efd0 100755
+--- a/tools/build.py
++++ b/tools/build.py
+@@ -389,6 +389,8 @@ def main():
+     ap = argparse.ArgumentParser()
+     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string vX.Y")
+     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
++    ap.add_argument("--identity", metavar="FM-1_9NN", help="the package identity instead of --release's FM-1_9XY "
++                    "(Dark Funk Durcal: its own number, FM-1_946)")
+     a = ap.parse_args()
+     name = "felucca.fwsc"
+     if a.release:                   # one digit each: the identity has room for two (X.Y.Z and X.Y.Z.W keep X.Y's)
+@@ -398,6 +400,10 @@ def main():
+         PRODUCT = "FM-1_9" + m[1] + m[2]
+         VERSION = "v" + a.release.lower()      # e.g. v1.0, v1.1-rc1
+         name = f"felucca-{a.release}.fwsc"
++    if a.identity:
++        if not re.fullmatch(r"FM-1_\d{3,10}", a.identity):
++            raise SystemExit(f"--identity {a.identity}: use FM-1_ and digits")
++        PRODUCT = a.identity
+     if not (FW / "engines" / "src" / "felucca_engine.h").exists():
+         raise SystemExit("firmware/engines is empty: the Felucca-Engines submodule "
+                          "(git submodule update --init, or clone with --recurse-submodules)")
+diff --git a/tools/gen_ui_palettes.py b/tools/gen_ui_palettes.py
+index a6674a0..b7c7372 100644
+--- a/tools/gen_ui_palettes.py
++++ b/tools/gen_ui_palettes.py
+@@ -55,6 +55,8 @@ PALETTES = [
+     # 1.0.2: black and white (the derived tokens are set, not blended: bw()); the old MONO is GREY (id 0)
+     # 1.8: its primary and secondary GREY's red and blue (were white)
+     ("MONO",   (0, 0, 0),       (255, 255, 255), (255, 255, 255), RED,       (72, 140, 255)),
++    # Dark Funk Durcal: bone on near-black, blood red for the one active thing (appended: saved ids stay)
++    ("DURCAL", (16, 12, 8),     (226, 212, 178), (238, 230, 212), RED,       (240, 96, 68)),
+ ]
+ BW = "MONO"
+ BW_GREY = (82, 82, 82)             # MONO's one mid grey (RGB565 10/20/10): DIM LINE RAISE LANE
+@@ -194,7 +196,7 @@ def main():
+         for p in PALETTES:
+             v = [to565(c, p[0] == BW) for c in p[1:]]
+             out.append(f'    {{"{p[0]}", ' + ", ".join(f"0x{x:04x}" for x in v) + "},")
+-        out += ["};", f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_GREY_INDEX 0u",
++        out += ["};", f"#define UI_NPALETTES {len(PALETTES)}u", "#define UI_GREY_INDEX 0u", f"#define UI_DURCAL_INDEX {[n for n,*_ in PALETTES].index('DURCAL')}u",
+                 f"#define UI_BW_INDEX {names.index(BW)}u          /* MONO: black and white (src/gfx.c palette_set) */",
+                 f"#define UI_BW_GREY 0x{to565(BW_GREY):04x}u          /* MONO's one grey: DIM LINE RAISE LANE */",
+                 f"#define UI_PAL_TAG {PAL_TAG}u          /* stored id = UI_PAL_TAG + index; below 20: an old id */"]
+diff --git a/web/editor.html b/web/editor.html
+index d9db178..f804100 100644
+--- a/web/editor.html
++++ b/web/editor.html
+@@ -1690,7 +1690,7 @@ function makeMockDevice(opt = {}) {
+       "GRAIN", "PHYS", "DRUM", "NOISE", "FM6", "SLICE"], 0), E("SET", NGO, 0),
+     E("CLRSQ", NGO, 0), E("INIT", NGO, 0),
+     E("TYPE", ["ROOM", "SPRING", "HALL"], 2),       /* G_RTYPE (id 24, was G_DRCH): the reverb's model (HALL: 1.2) */
+-    D("-", F.INT, 0, 0, 0), D("-", F.INT, 0, 0, 0),   /* G_DRLVL, G_DRREV: inert since 1.0 */
++    E("HEADS", ["OFF", "H1", "H2", "H3", "H1+2", "H2+3", "H1+3", "ALL"], 0), D("WOW", F.PCT, 0, 127, 0),   /* G_DRLVL, G_DRREV: Dark Funk Durcal TAPE ECHO (fx.c) */
+   ];
+   const NONE = D("-", F.INT, 0, 0, 0);
+   const RATIO = [".5", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "14", "16"];
+@@ -1703,7 +1703,17 @@ function makeMockDevice(opt = {}) {
+         P("ACID", [0, 0, 0, 0, 50, 100, 25, 64], [0, 55, 20, 30], 1, 1), P("SINE KEY", [3, 6, 50, 0, 127, 0, 0, 0], [2, 80, 30, 70], 0, 6),
+         P("RAVE", [4, 30, 64, 0, 85, 20, 30, 64], [20, 80, 110, 60], 1, 13), P("SUB BASS", [3, 0, 0, 0, 40, 0, 20, 0], [0, 60, 100, 20], 1, 8),
+         P("PLUCK", [0, 8, 50, 0, 30, 40, 0, 64], [0, 88, 0, 60], 0, 3), P("BRASS", [0, 10, 64, 0, 45, 20, 10, 64], [35, 70, 90, 45], 0, 6),
+-        P("WIND", [0, 0, 0, 90, 30, 90, 0, 0], [60, 90, 60, 80], 0, 5), P("STRINGS", [0, 25, 64, 0, 70, 10, 0, 32], [70, 90, 115, 90], 0, 5)] },
++        P("WIND", [0, 0, 0, 90, 30, 90, 0, 0], [60, 90, 60, 80], 0, 5), P("STRINGS", [0, 25, 64, 0, 70, 10, 0, 32], [70, 90, 115, 90], 0, 5),
++        P("DFD ACID", [0, 0, 0, 0, 44, 108, 40, 64], [0, 50, 15, 25], 1, 1),
++        P("SQUELCH", [0, 0, 0, 0, 30, 120, 55, 64], [0, 40, 10, 20], 1, 1),
++        P("BLACK ACID", [0, 0, 30, 0, 26, 112, 100, 64], [0, 62, 25, 30], 1, 1),
++        P("RUBBER ACID", [1, 0, 40, 0, 52, 80, 20, 64], [0, 70, 40, 30], 1, 1),
++        P("SERPENT", [0, 0, 0, 0, 24, 124, 45, 64], [0, 90, 30, 40], 1, 1),
++        P("ACID LASER", [0, 0, 0, 0, 16, 126, 80, 64], [0, 25, 0, 15], 1, 1),
++        P("ACID 2", [1, 0, 0, 0, 40, 104, 35, 64], [0, 48, 15, 25], 1, 1),
++        P("REESE", [0, 40, 64, 0, 40, 40, 30, 32], [0, 90, 100, 40], 1, 8),
++        P("DETUNE PAD", [0, 30, 64, 6, 60, 15, 0, 32], [90, 90, 110, 100], 0, 5),
++        P("BRAIN LEAD", [1, 14, 50, 0, 70, 50, 20, 64], [2, 60, 60, 40], 1, 4)] },
+     /* 1: reserved (DIGITAL, retired: src/fm4_convert.c ENG_FM4_GONE; its sounds load as FM6, FM4 above) */
+     { name: "-", titles: ["-", "-"], edit: [D("-", F.INT, 0, 7, 0), D("-", F.INT, 0, 14, 1), D("-", F.INT, 0, 14, 1),
+         D("-", F.INT, 0, 14, 1), D("-", F.PCT, 0, 127, 60), D("-", F.INT, 0, 127, 60), D("-", F.PCT, 0, 127, 0), NONE],
+@@ -2850,7 +2860,7 @@ const LAYOUT = (pe0) => [
+     ...[0, 1, 2, 3].map((k) => [`OP${k + 1}`, 0, [61 + 5 * k, 62 + 5 * k, 63 + 5 * k, 64 + 5 * k]]),
+     ["OP LVL", 0, [65, 70, 75, 80]]] }] : []),
+   { t: "VOICE", pages: [["LEVEL", 0, [0]], ["VOICE", 0, [37, 38, 41, 42]], ["VOICE 2", 0, [43, 44, 39, 40]]] },
+-  { t: "FX", pages: [["FX", 0, [33, 34, 35, 36]], ["SLICER", 0, [45, 46, 47, 48]], ["DLY", 1, [4, 5, 6, 7]], ["REVERB", 1, [24, 8, 9]], ["CHORUS", 1, [10, 11]]] },   /* G_RTYPE 24: ROOM / SPRING / HALL */
++  { t: "FX", pages: [["FX", 0, [33, 34, 35, 36]], ["SLICER", 0, [45, 46, 47, 48]], ["DLY", 1, [4, 5, 6, 7]], ["TAPE ECHO", 1, [25, 26, 5, 7]], ["REVERB", 1, [24, 8, 9]], ["CHORUS", 1, [10, 11]]] },   /* G_RTYPE 24: ROOM / SPRING / HALL */
+   { t: "SCL", pages: [["SCL", 0, [25, 26, 27, 28]], ...(pe0 >= 83 ? [["CHORD", 0, P_CHORD]] : [])] },   /* CHRD VOIC 81, 82 */
+   { t: "ARP", pages: [["ARP", 0, [17, 18, 19, 20]], ["ARP 2", 0, [21, 22, 23, 24]]] },
+   { t: "SEQ PATTERN", tab: "seqgroups", pages: [["PATTERN", 0, [29, 30, 31, 32]]] },
+diff --git a/web/test_web.mjs b/web/test_web.mjs
+index af3179f..1a704b8 100644
+--- a/web/test_web.mjs
++++ b/web/test_web.mjs
+@@ -295,8 +295,8 @@ async function editorMock() {
+     const inert = [25, 26].map(async (id) => E.parse[E.CMD.DESC](await rq(E.req.desc(1, id))));
+     const [d25, d26] = await Promise.all(inert);
+     ok(rd.label === "TYPE" && rd.def === 2 && eq(rd.names, ["ROOM", "SPRING", "HALL"]) && r1.value === 2 && r0.value === 0 &&
+-       d25.label === "-" && d26.label === "-" && d25.max === 0 && info.gcount === 27,
+-      "editor: REVERB TYPE (ROOM / SPRING / HALL, global id 24; 25, 26 still inert)");
++       d25.label === "HEADS" && d26.label === "WOW" && d25.max === 7 && d26.max === 127 && d25.def === 0 && info.gcount === 27,
++      "editor: REVERB TYPE (ROOM / SPRING / HALL, global id 24); 25, 26 Dark Funk Durcal's TAPE ECHO HEADS / WOW");
+   }
+   const st = E.parse[E.CMD.STEP_SET](await rq(E.req.stepSet(5, { n: 2, notes: [60, 64], time: 0, flags: 1, vel: 100 })));
+   ok(st.n === 2 && st.notes[1] === 64 && st.vel === 100, "editor: STEP_SET");

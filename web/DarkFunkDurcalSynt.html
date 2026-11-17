@@ -1486,6 +1486,265 @@ function bind(){
 try{const l=localStorage.getItem('dfds_lang');if(l)LANG=l;else LANG=/^es/i.test(navigator.language||'')?'en':'en'}catch(e){}
 buildEyeDeco();bind();applyLang();renderAll();updPlayBtn();requestAnimationFrame(frame);requestAnimationFrame(bootLoop);
 
+
+// =================== v2: NEW SOUNDS, NEW STYLES, LIVE MODE, NEXT PHRASE, PADS ===================
+// ---- lead: three new voices (vocal formants, velvet electric piano, music box)
+KINDS.lead=['BELL','CRYSTAL','SAW','GHOST','HOOVER','RAVE STAB','VOX FORMANT','VELVET EP','MUSIC BOX'];
+SPRE.lead.forEach(([,o])=>{if(o.kind!=null&&!o._v2){o.kind=(kIdx(o.kind,6)+.5)/9;o._v2=1}});
+function v2Remap(){PRJ.tr.forEach((tr,i)=>{if(!tr.p||tr._v2)return;if(TDEF[i].type==='lead'||i===6)tr.p.kind=(kIdx(tr.p.kind||0,6)+.5)/9;if(tr.p.motor!=null)tr.p.motor=tr.p.motor<.5?.1:.35;tr._v2=1})}
+v2Remap();const _loadPrjV1=loadPrj;loadPrj=function(o){_loadPrjV1(o);v2Remap();renderAll()};
+SPRE.lead.push(
+  ['Vox Formant',{kind:(6+.5)/9,bright:.55,decay:.6,vib:.35,detune:.3,_v2:1}],
+  ['Window Glass Vox',{kind:(6+.5)/9,bright:.8,decay:.5,vib:.55,detune:.6,_v2:1}],
+  ['Velvet EP',{kind:(7+.5)/9,bright:.45,decay:.7,vib:.25,detune:.2,_v2:1}],
+  ['Soul 9th EP',{kind:(7+.5)/9,bright:.65,decay:.55,vib:.15,detune:.1,_v2:1}],
+  ['Music Box',{kind:(8+.5)/9,bright:.7,decay:.4,vib:0,detune:.15,_v2:1}],
+  ['Prepared Piano',{kind:(8+.5)/9,bright:.35,decay:.25,vib:0,detune:.6,_v2:1}]);
+const _playLead6=playLead;
+playLead=function(out,t,p,note,dur,vel){
+  const k=kIdx(p.kind,9);
+  if(k<6)return _playLead6(out,t,Object.assign({},p,{kind:(k+.5)/6}),note,dur,vel);
+  const f=mtof(note),g=ctx.createGain(),end=t+dur+1.4+p.decay*2;
+  if(k===6){ // VOX: glottal saw + pulse through three formant band-passes; the vowel moves (a talking, pitch-scooping voice)
+    const F=[[730,1090,2440],[530,1840,2480],[270,2290,3010],[570,840,2410],[300,870,2240]];
+    const v0=F[Math.floor(Math.random()*2)],v1=F[2+Math.floor(Math.random()*3)];
+    const src=ctx.createGain();src.gain.value=.5;
+    const vib=ctx.createOscillator(),vg=ctx.createGain();vib.frequency.value=5.4;vg.gain.setValueAtTime(0,t);vg.gain.linearRampToValueAtTime(f*p.vib*.03,t+.3);vib.connect(vg);vib.start(t);vib.stop(end);
+    ['sawtooth','square'].forEach((ty,ix)=>{const o=ctx.createOscillator();o.type=ty;o.frequency.setValueAtTime(f*.93,t);o.frequency.exponentialRampToValueAtTime(f,t+.09);
+      o.detune.value=(ix?1:-1)*p.detune*9;vg.connect(o.frequency);const og=ctx.createGain();og.gain.value=ix?.25:.6;o.connect(og).connect(src);o.start(t);o.stop(end)});
+    const sum=ctx.createGain();
+    for(let q=0;q<3;q++){const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.Q.value=[9,11,13][q];
+      bp.frequency.setValueAtTime(v0[q],t);bp.frequency.linearRampToValueAtTime(v1[q],t+Math.min(dur,.35));
+      const bg=ctx.createGain();bg.gain.value=[1.4,1,.45+p.bright*.6][q];src.connect(bp).connect(bg).connect(sum)}
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*.9,t+.03);g.gain.setTargetAtTime(vel*.7,t+.1,.3);g.gain.setTargetAtTime(0.0001,t+dur,.08+p.decay*.25);
+    sum.connect(g);
+  }else if(k===7){ // VELVET EP: FM tine, modulator 1:1 with a decaying index, a 14:1 bell click and tremolo
+    const c=ctx.createOscillator(),m=ctx.createOscillator(),mg=ctx.createGain(),tn=ctx.createOscillator(),tg=ctx.createGain(),trem=ctx.createOscillator(),trg=ctx.createGain();
+    c.frequency.value=f;m.frequency.value=f;tn.frequency.value=f*14;
+    mg.gain.setValueAtTime(f*(.8+p.bright*2.5),t);mg.gain.exponentialRampToValueAtTime(f*.25+1,t+.4+p.decay);
+    tg.gain.setValueAtTime(vel*.08*p.bright,t);tg.gain.exponentialRampToValueAtTime(.0001,t+.08);
+    trem.frequency.value=4.6;trg.gain.value=.18*p.vib;trem.connect(trg).connect(g.gain);
+    m.connect(mg).connect(c.frequency);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*.42,t+.004);g.gain.setTargetAtTime(vel*.16,t+.05,.5+p.decay);g.gain.setTargetAtTime(0.0001,t+dur,.18+p.decay*.3);
+    c.connect(g);tn.connect(tg).connect(g);[c,m,tn,trem].forEach(o=>{o.start(t);o.stop(end)});
+  }else{ // MUSIC BOX / prepared piano: FM bell, short and glassy
+    const c=ctx.createOscillator(),m=ctx.createOscillator(),mg=ctx.createGain(),h=ctx.createOscillator(),hg=ctx.createGain();
+    c.frequency.value=f;m.frequency.value=f*3.5;h.frequency.value=f*4*(1+p.detune*.004);
+    mg.gain.setValueAtTime(f*(1+p.bright*2),t);mg.gain.exponentialRampToValueAtTime(1,t+.25+p.decay*.6);
+    hg.gain.setValueAtTime(vel*.12,t);hg.gain.exponentialRampToValueAtTime(.0001,t+.3);
+    m.connect(mg).connect(c.frequency);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*.4,t+.002);g.gain.exponentialRampToValueAtTime(.0001,t+.25+p.decay*1.4);
+    c.connect(g);h.connect(hg).connect(g);[c,m,h].forEach(o=>{o.start(t);o.stop(end)});
+  }
+  g.connect(out);
+};
+// ---- bass: two new engines (rubber wah, slap)
+KEYK.motor=['FM','ACID 2','RUBBER WAH','SLAP'];
+SPRE.bass.push(['Rubber Wah',{motor:.6,tone:.6,decay:.5,glide:.35,sub:.5}],['Slap Bass',{motor:.9,tone:.55,decay:.25,glide:.05,sub:.4}],['Fretless Glide',{motor:.9,tone:.4,decay:.6,glide:.5,sub:.5}]);
+const _playBass2=playBass;
+playBass=function(out,t,p,note,dur,vel,acc){
+  const k=kIdx(p.motor,4);
+  if(k<2)return _playBass2(out,t,Object.assign({},p,{motor:(k+.5)/2}),note,dur,vel,acc);
+  const f=mtof(note),from=mtof(bassLast);bassLast=note;
+  const g=ctx.createGain(),flt=ctx.createBiquadFilter(),glide=p.glide*.15,end=t+dur+.3;
+  const o1=ctx.createOscillator(),o2=ctx.createOscillator(),sub=ctx.createOscillator(),sg=ctx.createGain();
+  [o1,o2,sub].forEach((o,ix)=>{const mul=ix===2?.5:1;o.frequency.setValueAtTime((glide>.005?from:f)*mul*(k===2&&ix<2?.94:1),t);o.frequency.exponentialRampToValueAtTime(f*mul,t+Math.max(glide,k===2?.08:.01))});
+  o1.type='sawtooth';o2.type='square';o2.detune.value=k===2?-1200:8;sub.type='sine';sg.gain.value=p.sub*.7;
+  if(k===2){ // RUBBER WAH: a resonant band-pass that opens and closes on every note
+    flt.type='bandpass';flt.Q.value=4+p.tone*6;const lo=180+p.tone*300,hi=lo*(3+p.tone*5)*(acc?1.4:1);
+    flt.frequency.setValueAtTime(lo,t);flt.frequency.exponentialRampToValueAtTime(hi,t+.06);flt.frequency.exponentialRampToValueAtTime(lo*1.3,t+.12+p.decay*.5);
+  }else{ // SLAP: a bright pluck that darkens fast, with a thumb click
+    flt.type='lowpass';flt.Q.value=2;flt.frequency.setValueAtTime(2000+p.tone*5000,t);flt.frequency.exponentialRampToValueAtTime(220+p.tone*500,t+.05+p.decay*.25);
+    const ck=ctx.createBufferSource(),cg=ctx.createGain();ck.buffer=noiseBuf;cg.gain.setValueAtTime(vel*.25,t);cg.gain.exponentialRampToValueAtTime(.0001,t+.012);ck.connect(cg).connect(g);ck.start(t);ck.stop(t+.02);
+  }
+  const og=ctx.createGain();og.gain.value=.5;o1.connect(og);o2.connect(og);og.connect(flt).connect(g);sub.connect(sg).connect(g);
+  const dec=Math.min(dur,.1+p.decay*1.2);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*.85,t+.004);g.gain.setTargetAtTime(vel*.55,t+.02,dec*.6);g.gain.setTargetAtTime(0.0001,t+dur,.03);
+  g.connect(out);[o1,o2,sub].forEach(o=>{o.start(t);o.stop(end)});
+};
+// ---- four new styles and songs
+MOODS.soul={n:'Soul',sc:[0,2,3,5,7,9,10],scn:'dorian (7ths & 9ths)',prog:[[0,3,0,3],[0,6,3,4],[1,4,0,0]]};
+Object.assign(STYLES,{
+  warpfunk:{n:'Warped Funk',bpm:[100,108],dr:'funk',feel:'soul',sw:.3,acidD:.4,lead:.45,rolls:.35,snd:{kick:'Heartbeat',snare:'Funk Rim',hat:'Fine',perc:'Blip',acid:'Square Rubber',bass:'Rubber Wah',lead:'Vox Formant',pad:'Mute Organ'}},
+  slapdnb:{n:'Slap DnB',bpm:[168,178],dr:'drill',feel:'funky',sw:.04,acidD:.45,lead:.4,rolls:.6,snd:{kick:'Jungle Thump',snare:'Break Crack',hat:'Jungle Shaker',perc:'Glitch Spray',acid:'Squelch',bass:'Slap Bass',lead:'Velvet EP',pad:'Glass'}},
+  toybox:{n:'Music Box IDM',bpm:[112,132],dr:'brain',feel:'melancholy',sw:.08,acidD:.35,lead:.6,rolls:.55,snd:{kick:'Heartbeat',snare:'Funk Rim',hat:'Fine',perc:'Blip',acid:'Bubble',bass:'Hidden Sub',lead:'Music Box',pad:'Glass'}},
+  spectral:{n:'Spectral Step',bpm:[134,144],dr:'twostep',feel:'hypnotic',sw:.1,acidD:.5,lead:.35,rolls:.3,snd:{kick:'Punch 909',snare:'Dark Clap',hat:'Sand',perc:'Laser Zap',acid:'Classic',bass:'FM Rubber',lead:'Window Glass Vox',pad:'Fog'}},
+});
+SONGS.push(
+  {n:'Rubber Lips Funk',a:'warpfunk',b:'funk',bl:.25,mood:'soul',seed:2101,c:.55},
+  {n:'Slap Frenzy',a:'slapdnb',b:'drill',bl:.3,mood:'funky',seed:2102,c:.7},
+  {n:'Prepared Lullaby',a:'toybox',b:'ambient',bl:.35,mood:'melancholy',seed:2103,c:.5},
+  {n:'Spectral Step',a:'spectral',b:'warpfunk',bl:.3,mood:'hypnotic',seed:2104,c:.55},
+  {n:'Velvet Ghosts',a:'warpfunk',b:'brain',bl:.4,mood:'soul',seed:2105,c:.6});
+// ---- LIVE: pads, scenes, next phrase, keys
+const LIVE={fill:false,build:false,buildT:0,orig:null,cands:null,pick:-1,held:{}};
+const PAD_NAMES=['MUTE DRUMS','MUTE ACID','MUTE BASS','MUTE LEAD','FILL','STUTTER','BUILD / DROP','NEXT PHRASE'];
+const PAD_TRACKS=[[0,1,2,3],[4],[5],[6,7]];
+function livePad(k,down){
+  if(k<4){if(!down)return;const tr=PAD_TRACKS[k],m=!PRJ.tr[tr[0]].mute;tr.forEach(i=>PRJ.tr[i].mute=m);applyMix();renderTrackBar();}
+  else if(k===4)LIVE.fill=down;
+  else if(k===5){if(down&&playing){stutter={from:stepCount-(stepCount%2),len:2};fxShake(6)}else stutter=null}
+  else if(k===6){if(down){LIVE.build=true;LIVE.buildT=ctx?ctx.currentTime:0;if(ctx)master.hp.frequency.setTargetAtTime(2400,ctx.currentTime,3.5)}
+    else if(LIVE.build){LIVE.build=false;if(ctx){master.hp.frequency.cancelScheduledValues(ctx.currentTime);master.hp.frequency.setTargetAtTime(20,ctx.currentTime,.01);
+      const t=ctx.currentTime+.01;playKick(trackNodes[0].in,t,Object.assign({},PRJ.tr[0].p,{decay:1,punch:1}),1.2,1);fxBig($('#livePads'))}}}
+  else if(k===7&&down)nextPhrase();
+  LIVE.held[k]=down;renderLive();
+}
+const _scheduleStepV1=scheduleStep;
+scheduleStep=function(gs,t,d){
+  _scheduleStepV1(gs,t,d);
+  if(LIVE.fill||LIVE.build){const pos=gs%16;const rr=LIVE.build?(ctx.currentTime-LIVE.buildT<2?1:ctx.currentTime-LIVE.buildT<4?2:4):(pos>=12?3:1);
+    trigger(1,{...emptyStep(),on:1,n:38,v:LIVE.build?Math.min(1,.5+(ctx.currentTime-LIVE.buildT)*.08):.75,r:rr},t,d,{});
+    if(pos%4===0)trigger(0,{...emptyStep(),on:1,n:36,v:.9},t,d,{})}
+};
+function nextPhrase(){ // three continuations of the melody (track LEAD) that always fit
+  const ti=6,tr=P().tracks[ti];if(!LIVE.orig)LIVE.orig=clone(tr);const base=LIVE.orig;
+  const on=base.steps.filter((s,i)=>i<base.len&&s.on);if(!on.length){toast('Make a melody first (MELODY tab)');return}
+  const degs=on.map(s=>degOf(s.n)),mid=Math.round(degs.reduce((a,b)=>a+b,0)/degs.length),L=curScale().length;
+  const mk=fn=>{const c=clone(base);c.steps.forEach((s,i)=>{if(i<c.len&&s.on)s.n=fn(s,i,c.len)});
+    for(let i=c.len-1;i>=0;i--)if(c.steps[i].on){c.steps[i].n=scaleNote(fn===f3?mid+2:Math.floor(mid/L)*L,0);break}return c};
+  const f1=(s)=>scaleNote(2*mid-degOf(s.n),0),f2=(s)=>chance(.35)?scaleNote(degOf(s.n)+(chance(.5)?1:-1),0):s.n,f3=(s,i,len)=>i>=len/2?scaleNote(degOf(s.n)+Math.floor((i-len/2)/3),0):s.n;
+  LIVE.cands=[mk(f1),mk(f2),mk(f3)];LIVE.pick=0;P().tracks[ti]=clone(LIVE.cands[0]);renderGrid();renderLive();toast(t('3 next phrases: try 1, 2, 3 and KEEP'));
+}
+function pickPhrase(k){if(!LIVE.cands)return nextPhrase();LIVE.pick=k;P().tracks[6]=clone(LIVE.cands[k]);renderGrid();renderLive()}
+function keepPhrase(){if(!LIVE.cands)return;LIVE.orig=null;LIVE.cands=null;LIVE.pick=-1;renderLive();toast(t('Kept'))}
+function backPhrase(){if(!LIVE.orig)return;P().tracks[6]=clone(LIVE.orig);LIVE.orig=null;LIVE.cands=null;LIVE.pick=-1;renderGrid();renderLive()}
+// the panel
+(function(){
+  const tb=document.querySelector('#tabs button[data-t="orc"]')||document.querySelector('#tabs button:last-child');const b=document.createElement('button');b.dataset.t='live';b.textContent='◉ LIVE';tb.after(b);
+  const p=document.createElement('div');p.className='panel';p.id='p-live';
+  p.innerHTML=`<div class="lbl orn">PERFORM · <span class="hint">pads 1–8 = keys 1–8 · KeyLab / MIDI pads (notes 36–43, ch 10 or 11)</span></div>
+  <div id="livePads" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 14px"></div>
+  <div class="lbl orn">SCENES · <span class="hint">click = plays from the next bar · the sequence keeps running</span></div>
+  <div class="row c" id="liveScenes" style="gap:6px;flex-wrap:wrap;margin:6px 0 14px"></div>
+  <div class="lbl orn">NEXT PHRASE · <span class="hint">3 continuations of your melody that always fit</span></div>
+  <div class="row c" style="gap:6px;margin:6px 0 14px"><button id="lpGen" class="big">✦ 3 NEXT</button><button id="lp1">1 ANSWER</button><button id="lp2">2 VARIATION</button><button id="lp3">3 TENSION</button><button id="lpKeep">KEEP</button><button id="lpBack">BACK</button></div>
+  <div class="lbl orn">PLAY · <span class="hint">computer keys A S D F G H J K (and Q–I one octave up) play the melody sound, always in key</span></div>
+  <div class="row c" id="liveKeys" style="gap:4px;margin:6px 0"></div>`;
+  (document.getElementById('p-orc')||document.querySelector('.panel:last-of-type')).after(p);
+  b.onclick=()=>{UI.tab='live';document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.panel').forEach(q=>q.classList.toggle('show',q.id==='p-live'));renderLive()};
+  const pads=p.querySelector('#livePads');
+  PAD_NAMES.forEach((n,k)=>{const e=document.createElement('button');e.className='lpad';e.innerHTML=`<small>PAD ${k+1}</small><br>${n}`;e.style.cssText='min-height:68px;font-size:15px;font-weight:700';
+    const on=ev=>{ev.preventDefault();if(!ctx)initAudio();livePad(k,true)},off=()=>{if(LIVE.held[k])livePad(k,false)};
+    e.onpointerdown=on;e.onpointerup=e.onpointerleave=e.onpointercancel=off;pads.appendChild(e)});
+  const sc=p.querySelector('#liveScenes');'ABCDEFGH'.split('').forEach((L,j)=>{const e=document.createElement('button');e.textContent=L;e.style.minWidth='44px';e.onclick=()=>{if(playing){queuedPat=j;toast('Next bar: '+L)}else{PRJ.cur=j;renderAll()}renderLive()};sc.appendChild(e)});
+  p.querySelector('#lpGen').onclick=nextPhrase;p.querySelector('#lp1').onclick=()=>pickPhrase(0);p.querySelector('#lp2').onclick=()=>pickPhrase(1);p.querySelector('#lp3').onclick=()=>pickPhrase(2);
+  p.querySelector('#lpKeep').onclick=keepPhrase;p.querySelector('#lpBack').onclick=backPhrase;
+  const kk=p.querySelector('#liveKeys');'ASDFGHJK'.split('').forEach((c,k)=>{const e=document.createElement('button');e.textContent=c;e.style.minWidth='40px';
+    e.onpointerdown=ev=>{ev.preventDefault();liveKey(k,false)};kk.appendChild(e)});
+})();
+function renderLive(){
+  const pads=document.querySelectorAll('#livePads .lpad');pads.forEach((e,k)=>{const lit=k<4?!!PRJ.tr[PAD_TRACKS[k][0]].mute:!!LIVE.held[k]||(k===7&&!!LIVE.cands);e.classList.toggle('on',lit)});
+  document.querySelectorAll('#liveScenes button').forEach((e,j)=>{e.classList.toggle('on',PRJ.cur===j);e.style.borderColor=queuedPat===j?'var(--blood)':'';e.style.opacity=patEmpty(PRJ.pats[j])&&PRJ.cur!==j?.55:1});
+  ['lp1','lp2','lp3'].forEach((id,k)=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',LIVE.pick===k)});
+}
+setInterval(()=>{if(UI.tab==='live')renderLive()},250);
+function liveKey(k,up){if(!ctx){initAudio();}const ti=6;const n=scaleNote(k+(up?curScale().length:0),melBase?melBase(ti):60);
+  liveNote(ti,{...emptyStep(),on:1,n,v:.85,g:2})}
+const KEYROW='asdfghjk',KEYUP='qwertyui';
+// only while the LIVE tab is open: number keys are pads, letter rows play in key (elsewhere the old keys keep working)
+addEventListener('keydown',e=>{if(UI.tab!=='live'||e.metaKey||e.ctrlKey||/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
+  const c=e.key.toLowerCase();let hit=false;
+  if(/^[1-8]$/.test(c)){if(!e.repeat)livePad(+c-1,true);hit=true}
+  else{let k=KEYROW.indexOf(c);if(k>=0){if(!e.repeat)liveKey(k,false);hit=true}else{k=KEYUP.indexOf(c);if(k>=0){if(!e.repeat)liveKey(k,true);hit=true}}}
+  if(hit){e.stopPropagation();e.preventDefault()}},true);
+addEventListener('keyup',e=>{if(UI.tab!=='live')return;const c=e.key.toLowerCase();if(/^[1-8]$/.test(c)){livePad(+c-1,false);e.stopPropagation()}},true);
+// MIDI pads (KeyLab and others): notes 36-43 on channel 10 or 11 are the live pads; keys play in key on the melody
+const _onMidiV1=onMidi;
+onMidi=function(e){const[st,d1,d2]=e.data;const cmd=st&0xF0,ch=st&15;
+  if((ch===9||ch===10)&&d1>=36&&d1<=43&&(cmd===0x90||cmd===0x80)){livePad(d1-36,cmd===0x90&&d2>0);return}
+  return _onMidiV1(e)};
+
+
+// =================== SMEAR: the eye as light through a broken screen (pixel-sort drips, warm/cool split, glow) ===================
+// warm on the left (ember orange, rose), white-hot in the middle, cold on the right (cyan, steel blue); columns of
+// pixels dragged down like a pixel sort, blocks of mosaic, a soft bloom; all of it breathing with the music
+const SMEAR={t:0,burst:0,seed:1,cols:[],blocks:[]};
+const SM_W=['#ff4a1c','#ff6b3d','#ff2f6d','#ffb38a'],SM_C=['#3ad7ff','#2a8bff','#7fe9ff','#5aa0c8'],SM_H='#fff4e6';
+(function(){
+  const NS='http://www.w3.org/2000/svg',svg=$('#eyeSvg'),defs=svg.querySelector('defs');
+  const mk=(tag,at,par)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(par)par.appendChild(e);return e};
+  const g=mk('linearGradient',{id:'smG',gradientUnits:'userSpaceOnUse',x1:-300,y1:0,x2:300,y2:0},defs);
+  [['0','#ff3d1f'],['.22','#ff6a4a'],['.38','#ffc7a3'],['.5',SM_H],['.62','#bff3ff'],['.8','#39c8ff'],['1','#2a5fd6']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},g));
+  const hc=mk('radialGradient',{id:'smHot'},defs);
+  [['0','#ffffff',.95],['.25','#fff1e0',.55],['.6','#ff9a6a',.12],['1','#2a8bff',0]].forEach(([o,c,a])=>mk('stop',{offset:o,'stop-color':c,'stop-opacity':a},hc));
+  // drips: vertical bands of noise push columns of the picture down; a soft sideways bloom under it all
+  const f=mk('filter',{id:'smF',x:'-25%',y:'-25%',width:'150%',height:'160%','color-interpolation-filters':'sRGB'},defs);
+  SMEAR.turb=mk('feTurbulence',{type:'fractalNoise',baseFrequency:'0.07 0.00001',numOctaves:1,seed:1,result:'n'},f);
+  mk('feColorMatrix',{in:'n',type:'matrix',values:'0 0 0 0 .5  1 0 0 0 0  0 0 0 0 0  0 0 0 0 1',result:'ny'},f);
+  SMEAR.disp=mk('feDisplacementMap',{in:'SourceGraphic',in2:'ny',scale:0,xChannelSelector:'R',yChannelSelector:'G',result:'d'},f);
+  SMEAR.blur=mk('feGaussianBlur',{in:'d',stdDeviation:'6 1',result:'b'},f);
+  mk('feColorMatrix',{in:'b',type:'matrix',values:'1.3 0 0 0 0  0 1.1 0 0 0  0 0 1.2 0 0  0 0 0 .8 0',result:'g'},f);
+  const m=mk('feMerge',{},f);['g','d'].forEach(x=>mk('feMergeNode',{in:x},m));
+  $('#sigil').setAttribute('stroke','url(#smG)');
+  ['#tendrils','#dots','#runes','#drip'].forEach(s=>{const e=$(s);if(e)e.setAttribute('fill','url(#smG)')});
+  $('#tendrils').querySelectorAll('[fill]').forEach(e=>e.setAttribute('fill','url(#smG)'));
+  $('#haloC').setAttribute('fill','url(#smHot)');
+  const cg=mk('radialGradient',{id:'smCore'},defs);[['0','#6b4a40'],['.45','#2a1d1a'],['1','#0e0c0b']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},cg));
+  const disc0=$('#sigil').querySelector('circle[r="140"]');if(disc0)disc0.setAttribute('fill','url(#smCore)');
+  // the pixel-sort columns and the mosaic blocks: behind the sigil (over the halo) and over it
+  SMEAR.back=mk('g',{id:'smBack',style:'mix-blend-mode:screen'});$('#haloC').after(SMEAR.back);
+  SMEAR.front=mk('g',{id:'smFront',style:'mix-blend-mode:screen'},svg);
+  SMEAR.glow=mk('ellipse',{cx:0,cy:-5,rx:150,ry:95,fill:'url(#smHot)',opacity:.35},SMEAR.front);
+  for(let k=0;k<110;k++)SMEAR.cols.push(mk('rect',{width:4,height:0,x:0,y:0,opacity:0},k<70?SMEAR.back:SMEAR.front));
+  for(let k=0;k<26;k++)SMEAR.blocks.push(mk('rect',{width:8,height:8,x:0,y:0,opacity:0},k<16?SMEAR.back:SMEAR.front));
+  ['#sigil','#tendrils','#dots'].forEach(s=>{const e=$(s);if(e)e.setAttribute('filter','url(#smF)')});
+})();
+function smColor(x){const u=(x+300)/600;if(u<.38)return SM_W[Math.floor(Math.random()*SM_W.length)];if(u>.62)return SM_C[Math.floor(Math.random()*SM_C.length)];return Math.random()<.5?SM_H:(u<.5?'#ffd2b8':'#d8f6ff')}
+function smearFrame(now){
+  const lv=clamp(eyeS.level||0,0,1),fl=eyeS.flash||0;
+  SMEAR.burst*=.9;const gl=Math.max(SMEAR.burst,stutter?.9:0,(typeof LIVE!=='undefined'&&LIVE.build)?.6:0);
+  SMEAR.t+=.01+lv*.03;
+  $('#smG').setAttribute('gradientTransform',`translate(${(Math.sin(SMEAR.t*.7)*40).toFixed(1)} 0)`);
+  SMEAR.glow.setAttribute('opacity',(.22+lv*.45+fl*.4).toFixed(2));SMEAR.glow.setAttribute('rx',(130+lv*60).toFixed(0));
+  $('#haloC').setAttribute('r',(230+lv*70+fl*60).toFixed(0));$('#haloC').setAttribute('opacity',(.75+lv*.25).toFixed(2));
+  if(Math.random()<.05+gl*.4)SMEAR.turb.setAttribute('seed',++SMEAR.seed);
+  const sc=6+lv*18+gl*70;SMEAR.disp.setAttribute('scale',sc.toFixed(1));
+  SMEAR.blur.setAttribute('stdDeviation',`${(4+lv*6+gl*8).toFixed(1)} ${(1+gl*6).toFixed(1)}`);
+  SMEAR.cols.forEach(c=>{let op=+c.getAttribute('opacity');
+    if(op<.04&&Math.random()<.07+lv*.15+gl*.3){const x=(Math.random()-.5)*(Math.random()<.6?320:620),w=1+Math.random()*(Math.random()<.2?14:5);
+      const h=20+Math.random()*(60+lv*160+gl*180),y=-170+Math.random()*200;
+      c.setAttribute('x',x.toFixed(0));c.setAttribute('y',y.toFixed(0));c.setAttribute('width',w.toFixed(1));c.setAttribute('height',h.toFixed(0));
+      c.setAttribute('fill',smColor(x));op=.35+Math.random()*.55;c.dataset.v=(.3+Math.random()*2.2+gl*4).toFixed(2)}
+    else{op*=.965;c.setAttribute('y',(+c.getAttribute('y')+ +(c.dataset.v||0)).toFixed(1));c.setAttribute('height',(+c.getAttribute('height')*1.012).toFixed(1))}
+    c.setAttribute('opacity',op.toFixed(3))});
+  SMEAR.blocks.forEach(b=>{let op=+b.getAttribute('opacity');
+    if(op<.04&&Math.random()<.02+gl*.25+fl*.2){const s=4+Math.random()*(Math.random()<.3?26:12),x=(Math.random()-.5)*380,y=(Math.random()-.5)*260;
+      b.setAttribute('x',x.toFixed(0));b.setAttribute('y',y.toFixed(0));b.setAttribute('width',(s*(1+Math.random()*2)).toFixed(0));b.setAttribute('height',s.toFixed(0));
+      b.setAttribute('fill',smColor(x));op=.3+Math.random()*.45}
+    else op*=.9;b.setAttribute('opacity',op.toFixed(3))});
+}
+const _drawEyeSm=drawEye;
+drawEye=function(now){_drawEyeSm(now);try{smearFrame(now)}catch(e){}};
+const _onHitSm=onHit;
+onHit=function(v){_onHitSm(v);if(v.i===0||v.i===1)SMEAR.burst=Math.max(SMEAR.burst,v.i===1?.5:.3)};
+
+// the same light on the canvas eyes (the boot ritual, the FM-1 screen): real pixel sorting there
+function smearCanvas(g,x,y,w,h,amt){
+  const c=g.canvas;x=Math.max(0,Math.floor(x));y=Math.max(0,Math.floor(y));w=Math.min(c.width-x,Math.ceil(w));h=Math.min(c.height-y,Math.ceil(h));if(w<4||h<4)return;
+  g.save();g.setTransform(1,0,0,1,0,0);
+  const gr=g.createLinearGradient(x,0,x+w,0);
+  [[0,'#ff3d1f'],[.25,'#ff7a55'],[.42,'#ffd9c2'],[.5,'#ffffff'],[.6,'#d2f5ff'],[.78,'#39c8ff'],[1,'#2a5fd6']].forEach(([o,col])=>gr.addColorStop(o,col));
+  g.globalCompositeOperation='multiply';g.fillStyle=gr;g.fillRect(x,y,w,h);
+  const rg=g.createRadialGradient(x+w/2,y+h/2,0,x+w/2,y+h/2,Math.min(w,h)*.5);rg.addColorStop(0,'rgba(255,250,240,'+(.3+amt*.4)+')');rg.addColorStop(1,'rgba(255,160,110,0)');
+  g.globalCompositeOperation='screen';g.fillStyle=rg;g.fillRect(x,y,w,h);
+  g.globalCompositeOperation='source-over';
+  const n=Math.floor(3+amt*26);
+  for(let k=0;k<n;k++){const cw=1+Math.floor(Math.random()*3),cx=x+Math.floor(Math.random()*(w-cw)),sy=y+Math.floor(Math.random()*h*.8),sh=1+Math.floor(Math.random()*3),len=h*(.05+Math.random()*(.15+amt*.5));
+    g.globalAlpha=.55+Math.random()*.4;g.drawImage(c,cx,sy,cw,sh,cx,sy,cw,Math.min(len,y+h-sy))}
+  g.globalAlpha=1;g.imageSmoothingEnabled=false;
+  const nb=Math.random()<.2+amt?1+Math.floor(amt*4):0;
+  for(let k=0;k<nb;k++){const s=Math.max(4,Math.floor(Math.min(w,h)*(.03+Math.random()*.08))),bx=x+Math.random()*(w-s),by=y+Math.random()*(h-s);g.drawImage(c,bx,by,3,3,bx,by,s*(1+Math.random()*2),s)}
+  g.imageSmoothingEnabled=true;g.restore();
+}
+const _bootLoopSm=bootLoop;
+bootLoop=function(now){_bootLoopSm(now);if(!bootRun)return;const c=$('#bootC');smearCanvas(c.getContext('2d'),0,0,c.width,c.height,Math.random()<.08?.6:.12)};
+let smRegions=[];
+const _drawEyeCSm=drawEyeC;
+drawEyeC=function(g,x,y,r,o){_drawEyeCSm(g,x,y,r,o);const m=g.getTransform();smRegions.push([g,m.a*(x-r*3.3)+m.e,m.d*(y-r*1.12)+m.f,m.a*r*6.6,m.d*r*2.3])};
+const _fm1DrawSm=fm1Draw;
+fm1Draw=function(now){smRegions=[];_fm1DrawSm(now);const amt=Math.max(SMEAR.burst,(eyeS.level||0)*.25);smRegions.forEach(([g,x,y,w,h])=>smearCanvas(g,x,y,w,h,amt));smRegions=[]};
+
 </script>
 </body>
 </html>

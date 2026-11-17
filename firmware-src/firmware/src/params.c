@@ -450,7 +450,7 @@ enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK };   /* SC_TRK: the TRACK
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
        GR_SLCR, GR_MOD, GR_PATS, GR_SONG, GR_TOOLS, GR_CHORD, GR_SLICES, GR_EVENTS,
        GR_FMOP, GR_FMOP2, GR_FMENV, GR_INS,
-       GR_DFD_RITUAL, GR_DFD_MELODY, GR_DFD_DICE, GR_DFD_STRETCH };   /* Dark Funk Durcal (dfd.c) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
+       GR_DFD_RITUAL, GR_DFD_MELODY, GR_DFD_DICE, GR_DFD_STRETCH, GR_DFD_LIVE, GR_DFD_NEXT };   /* Dark Funk Durcal (dfd.c) */   /* (GR_STEPS: SEQ TOOLS' knobs; GR_FMOP..: FM6's operator pages, ui_fm6op.c) */
 
 typedef struct {
     const char *title;
@@ -519,6 +519,8 @@ static const page_t PAGES[] = {
     {"MELODY", FAM_TRK, SC_GLOBAL, GR_DFD_MELODY, {0xFF, 0xFF, 0xFF, 0xFF}},
     {"DICE", FAM_TRK, SC_GLOBAL, GR_DFD_DICE, {0xFF, 0xFF, 0xFF, 0xFF}},
     {"STRETCH", FAM_TRK, SC_GLOBAL, GR_DFD_STRETCH, {0xFF, 0xFF, 0xFF, 0xFF}},
+    {"LIVE", FAM_TRK, SC_GLOBAL, GR_DFD_LIVE, {0xFF, 0xFF, 0xFF, 0xFF}},       /* dfd6: play it live */
+    {"NEXT", FAM_TRK, SC_GLOBAL, GR_DFD_NEXT, {0xFF, 0xFF, 0xFF, 0xFF}},       /* dfd6: the next phrase x3 */
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */

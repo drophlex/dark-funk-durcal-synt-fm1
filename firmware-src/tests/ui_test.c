@@ -2959,13 +2959,15 @@ static int test_product_ux(void)
     ok &= str_eq(cur_page()->title, "RITUAL");
     press(B_HOME); press(B_HOME); press(B_HOME);
     ok &= str_eq(cur_page()->title, "STRETCH");
+    press(B_HOME); press(B_HOME);                      /* dfd6: LIVE NEXT */
+    ok &= str_eq(cur_page()->title, "NEXT");
     press(B_HOME);
     ok &= ui.home && !ui.menu;
     press(B_HOME);
     ok &= cur_page()->graph == GR_TRK;
     go_title("ENV"); press(B_HOME);
     ok &= ui.home;
-    go_title("STRETCH"); press(B_HOME);
+    go_title("NEXT"); press(B_HOME);
     ok &= ui.home;
     bad += check("1.2: HOME cycles HOME > MIXER > CLOCK > HOME (CLOCK: BPM SWG CLK, HOME's LED); from any other page HOME", ok);
     hold(B_HOME);
@@ -9228,6 +9230,7 @@ static int test_fm6_ops(void)
     ok &= fm6_patch[tr][3u * FP_OP + FP_OL] == before[3u * FP_OP + FP_OL] - 7u &&
           fm6_patch[tr][3u * FP_OP + FP_FF] == before[3u * FP_OP + FP_FF] && slot_own();
     bad += check("FM6 ops: SAVE held undoes the gesture (patch and SLOT F5 back), again redoes; one undo per gesture", ok);
+    memset(&lv, 0, sizeof lv); dfd_live_fx = 0; perf_k[0] = 0;   /* (dfd6: the page sweep turned LIVE's knobs: its effects off) */
 
     ok = 1;                                          /* every operator, every byte the pages edit: that byte only */
     for (opn = 1; opn <= 6u; opn++)
@@ -9669,7 +9672,7 @@ static int test_home_tracks(void)
     bad += check("1.3 HOME > TRACKS: K1..K4 edit the selected track (HOME's four), ALGORITHM moves the selected row", ok);
     press(B_HOME); ok = !ui.home && cur_page()->graph == GR_TRK;
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
-    press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME);   /* (Dark Funk Durcal's four pages) */
+    press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME); press(B_HOME);   /* (Dark Funk Durcal's six pages) */
     press(B_HOME); ok &= ui.home;
     frame();
     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;

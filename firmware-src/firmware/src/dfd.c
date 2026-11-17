@@ -8,6 +8,8 @@
  *   DICE     each KNOB turned right rolls a die: K1 the drums, K2 the acid, K3 the melody, K4 a sound; OCT+ ROLL ALL
  *   STRETCH  SOURCE, STRETCH, PITCH, GRAIN; OCT+ APPLY: the selected track becomes a GRAIN time-stretch of a sample (a
  *            set or USR1..3: your own recordings), the scan locked to the bars (LFO SAW, SYNC, FREE), pitch on its own
+ *   LIVE     (dfd6) MUTES, REPEAT, BUILD, THROW; OCT+ DROP: everything off at once
+ *   NEXT     (dfd6) PHRASE ORIGINAL / ANSWER / VARIATION / TENSION of T2..T4, heard at once; K4 new ones; OCT+ KEEP
  * The eye: on these pages and on HOME. Integer maths, bounded loops; writes happen in the main loop (the UI), the way
  * a pattern or a preset load does them (load_begin / load_end: one undo). */
 
@@ -58,6 +60,12 @@ static const dfd_style_t DFD_STYLES[] = {
     {"ELECTR", "DARK ELECTRO", 126, 136, MOOD_DARK, DK_GRID, 8, 2, 16, 12, 2, 8, 12, 0, 12, 0, 65, 35, 20, 6},
     {"AMBIEN", "AMBIENT IDM", 86, 104, MOOD_DREAMY, DK_GRID, 9, 1, 16, 0, 7, 0, 0, 20, 0, 1, 40, 35, 25, 10},
     {"FUNK", "BROKEN FUNK", 98, 116, MOOD_FUNKY, DK_GRID, 10, 1, 15, 12, 2, 4, 12, 0, 18, 1, 60, 40, 20, 25},
+    /* dfd6: warped funk (a talking vox lead over rubber bass, slow and swung), slap drum n bass (EP chords), a music-box
+     * IDM (prepared piano, broken beats), spectral step (vox and reese) */
+    {"WARPFK", "WARPED FUNK", 100, 108, MOOD_FUNKY, DK_GRID, 10, 1, 15, 12, 1, 2, 5, 1, 0, 0, 45, 45, 35, 28},
+    {"SLAPDN", "SLAP DNB", 168, 178, MOOD_FUNKY, DK_BREAK, 1, 0, 13, 12, 1, 4, 12, 1, 18, 1, 45, 40, 60, 4},
+    {"TOYBOX", "MUSIC BOX IDM", 112, 132, MOOD_MELAN, DK_GRID, 7, 3, 15, 12, 1, 3, 12, 1, 17, 0, 35, 60, 55, 8},
+    {"SPECTR", "SPECTRAL STEP", 134, 144, MOOD_HYPNO, DK_GRID, 8, 2, 16, 0, 19, 0, 5, 1, 0, 0, 50, 35, 30, 10},
 };
 #define DFD_NSTYLES (sizeof DFD_STYLES / sizeof DFD_STYLES[0])
 /* the drum templates (16ths): x hit, g ghost, o open hat / accent; a style's set of 3 kicks, 3 snares, 2 hats */
@@ -615,7 +623,101 @@ static void dfd_stretch_apply(void)
 }
 
 /* ------------------------------------------------------------------ the pages' knobs and OCT+ --- */
-static int dfd_page(uint32_t g) { return g >= GR_DFD_RITUAL && g <= GR_DFD_STRETCH; }
+static int dfd_page(uint32_t g) { return g >= GR_DFD_RITUAL && g <= GR_DFD_NEXT; }
+
+/* ------------------------------------------------------------------ LIVE (dfd6) --- */
+/* K1 MUTES: a set of the tracks out (perform.c's black-key mutes: ramped, never saved), K2 REPEAT OFF 1/8 1/16 1/32
+ * (the FX layer's REPEAT, from the next 1/16), K3 BUILD: the master HPF climbing (the FX macro FILTER, right), K4 THROW
+ * OFF ECHO REVERB BOTH; OCT+ DROP: all of it off at once (the drop after a build). The FX layer works beside it. */
+static const char *const LV_MUTE[8] = {"ALL IN", "NO DRUMS", "NO ACID", "NO BASS", "NO LEAD", "DRUMS ONLY", "DRUM+BASS", "LEAD ONLY"};
+static const uint8_t LV_MBITS[8] = {0, 1, 2, 4, 8, 14, 10, 7};
+static const char *const LV_REP[4] = {"OFF", "1/8", "1/16", "1/32"};
+static const char *const LV_THR[4] = {"OFF", "ECHO", "VERB", "BOTH"};
+static const char *const LV_MCOL[8] = {"ALL", "NO DR", "NO AC", "NO BS", "NO LD", "DRUMS", "DR+BS", "LEAD"};
+static struct { uint8_t mutes, rep, build, thr; uint32_t drop_ms; } lv;
+static void dfd_live_apply(void)
+{
+    uint32_t b = (uint32_t)LV_MBITS[lv.mutes & 7u] << PF_M1;
+    if (lv.rep)
+        b |= PF_BIT(PF_R8 + lv.rep - 1u);
+    if (lv.thr & 1u) b |= PF_BIT(PF_ETHR);
+    if (lv.thr & 2u) b |= PF_BIT(PF_RTHR);
+    if (lv.rep && !((b >> (PF_R8 + lv.rep - 1u)) & perf_avail() & 1u))
+        ui_message("TOO SLOW FOR 1/8");
+    dfd_live_fx = b;
+    perf_k[0] = (int8_t)lv.build;
+}
+static void dfd_drop(void)
+{
+    lv.mutes = lv.rep = lv.build = lv.thr = 0;
+    dfd_live_apply();
+    lv.drop_ms = fm1_ms;
+    dfd.flash_ms = fm1_ms;
+    ui_say("DROP ", "");
+}
+
+/* ------------------------------------------------------------------ NEXT (dfd6) --- */
+/* Three continuations of a track's phrase that always fit: 1 ANSWER (the line mirrored around its middle, home at the
+ * end), 2 VARIATION (some notes a step up or down), 3 TENSION (the second half climbing, ending open). K1 PHRASE
+ * ORIGINAL / 1 / 2 / 3 (heard at once, browsing: one undo), K2 TRACK T2..T4, K4 turned: new ones; OCT+ KEEP. */
+static const char *const NX_NAME[4] = {"ORIGINAL", "1 ANSWER", "2 VARIATION", "3 TENSION"};
+static const char *const NX_COL[4] = {"ORIG", "ANSWR", "VARI", "TENSE"};
+static struct { uint8_t on, pick, tgt, seed, len; step_t orig[NSTEP]; } nx = {0, 0, 3, 1, 16, {{{0}}}};
+static uint32_t nx_r;
+static uint32_t nx_rnd(void) { nx_r = nx_r * 1664525u + 1013904223u; return nx_r >> 9; }
+static int32_t dfd_deg(uint32_t note)                 /* the scale degree (above C3 in the key) nearest a note */
+{
+    int32_t d, best = 0, bd = 999;
+    for (d = -28; d <= 42; d++) {
+        int32_t e = (int32_t)dfd_note(d, 48) - (int32_t)note;
+        e = e < 0 ? -e : e;
+        if (e < bd) { bd = e; best = d; }
+    }
+    return best;
+}
+static void nx_apply(void)
+{
+    track_t *t = &trk[nx.tgt % NTRK];
+    uint32_t i, cnt = 0, last = 0, len = nx.len ? nx.len : 16u;
+    int32_t sum = 0, mid, n;
+    uint8_t iv[12];
+    n = (int32_t)dfd_scale(iv);
+    load_begin(t, UNDO_PAT);
+    memcpy(t->step, nx.orig, sizeof nx.orig);
+    t->p[P_SLEN] = (int16_t)len;
+    for (i = 0; i < len && i < NSTEP; i++)
+        if (nx.orig[i].time == ST_NOTE && nx.orig[i].n) { sum += dfd_deg(nx.orig[i].note[0]); cnt++; last = i; }
+    if (nx.pick && cnt) {
+        mid = sum / (int32_t)cnt;
+        nx_r = 0x51ED27u + nx.seed * 7919u + nx.pick * 104729u;
+        for (i = 0; i < len && i < NSTEP; i++) {
+            step_t *s = &t->step[i];
+            int32_t d, nd, delta, k;
+            if (s->time != ST_NOTE || !s->n)
+                continue;
+            d = dfd_deg(s->note[0]);
+            if (nx.pick == 1u)
+                nd = 2 * mid - d + (int32_t)(nx_rnd() % 3u) - 1;
+            else if (nx.pick == 2u)
+                nd = nx_rnd() % 100u < 35u ? d + (nx_rnd() & 1u ? 1 : -1) * (int32_t)(1u + nx_rnd() % 2u) : d;
+            else
+                nd = i >= len / 2u ? d + (int32_t)(i - len / 2u) / 3 + 1 : d;
+            if (i == last)                           /* the end: home (ANSWER, VARIATION) or open, a fifth up (TENSION) */
+                nd = nx.pick == 3u ? (mid / n) * n + 4 + n : (nd + n * 8) / n * n - n * 8 + ((nd % n + n) % n > n / 2 ? n : 0);
+            delta = (int32_t)dfd_note(nd, 48) - (int32_t)s->note[0];
+            for (k = 0; k < s->n && k < 4; k++)
+                s->note[k] = (uint8_t)clamp((int32_t)s->note[k] + delta, 24, 108);
+        }
+    }
+    load_end(t);
+}
+static void nx_capture(void)
+{
+    track_t *t = &trk[nx.tgt % NTRK];
+    memcpy(nx.orig, t->step, sizeof nx.orig);
+    nx.len = (uint8_t)clamp(t->p[P_SLEN], 1, NSTEP);
+    nx.on = 1;
+}
 static int32_t dfd_step(int32_t v, int32_t d, int32_t lo, int32_t hi) { v += d; return v < lo ? lo : v > hi ? hi : v; }
 static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps)
 {
@@ -632,6 +734,28 @@ static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps)
     } else if (g == GR_DFD_DICE) {
         if (steps > 0)
             dfd_roll(slot);
+    } else if (g == GR_DFD_LIVE) {
+        if (slot == 0u) lv.mutes = (uint8_t)dfd_step(lv.mutes, steps > 0 ? 1 : -1, 0, 7);
+        if (slot == 1u) lv.rep = (uint8_t)dfd_step(lv.rep, steps > 0 ? 1 : -1, 0, 3);
+        if (slot == 2u) lv.build = (uint8_t)dfd_step(lv.build, steps * 3, 0, 100);
+        if (slot == 3u) lv.thr = (uint8_t)dfd_step(lv.thr, steps > 0 ? 1 : -1, 0, 3);
+        dfd_live_apply();
+    } else if (g == GR_DFD_NEXT) {
+        if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
+        if (slot == 1u) {
+            if (nx.on && nx.pick) { nx.pick = 0; nx_apply(); }
+            nx.on = 0;
+            nx.tgt = (uint8_t)dfd_step(nx.tgt, steps > 0 ? 1 : -1, 1, 3);
+        } else if (slot == 0u || (slot == 3u && steps > 0)) {
+            if (!nx.on)
+                nx_capture();
+            if (slot == 0u)
+                nx.pick = (uint8_t)dfd_step(nx.pick, steps > 0 ? 1 : -1, 0, 3);
+            else
+                nx.seed++;
+            nx_apply();
+            dfd.flash_ms = fm1_ms;
+        }
     } else {
         if (slot == 0u) dfd.src = (uint8_t)dfd_step(dfd.src, steps > 0 ? 1 : -1, 0, SMP_NALL - 1);
         if (slot == 1u) dfd.stretch = (uint8_t)dfd_step(dfd.stretch, steps > 0 ? 1 : -1, 0, 4);
@@ -645,7 +769,7 @@ static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps)
 static void dfd_oct(void)
 {
     uint32_t g = cur_page()->graph;
-    if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
+    if (chain_busy() && g != GR_DFD_LIVE) { ui_message("STOP TO EDIT"); return; }
     if (g == GR_DFD_RITUAL) {
         dfd_summon();
     } else if (g == GR_DFD_MELODY) {
@@ -663,6 +787,13 @@ static void dfd_oct(void)
         dfd.root = (uint8_t)dfd_pick(12);
         dfd_summon();
         dfd.last_roll = "EVERYTHING";
+    } else if (g == GR_DFD_LIVE) {
+        dfd_drop();
+    } else if (g == GR_DFD_NEXT) {
+        nx.on = 0;                                   /* KEEP: what plays stays; the next turn starts from it */
+        nx.pick = 0;
+        dfd.flash_ms = fm1_ms;
+        ui_say("KEPT", "");
     } else {
         dfd_stretch_apply();
     }
@@ -671,7 +802,8 @@ static void dfd_oct(void)
 static const char *dfd_act_name(void)
 {
     uint32_t g = cur_page()->graph;
-    return g == GR_DFD_RITUAL ? "SUMMON" : g == GR_DFD_MELODY ? "MAKE" : g == GR_DFD_DICE ? "ALL" : "APPLY";
+    return g == GR_DFD_RITUAL ? "SUMMON" : g == GR_DFD_MELODY ? "MAKE" : g == GR_DFD_DICE ? "ALL" : g == GR_DFD_LIVE ? "DROP" :
+           g == GR_DFD_NEXT ? "KEEP" : "APPLY";
 }
 
 /* ------------------------------------------------------------------ the eye --- */
@@ -765,6 +897,83 @@ static void dfd_eye(int32_t cx, int32_t cy, int32_t r, int32_t open, int32_t lx,
         dfd_line(cx - W * 2 / 3, cy - H - 2, cx + W * 2 / 3, cy - H - 2, 1, faint);
     }
 }
+/* SMEAR (dfd6): the eye as light through a broken screen. A pass over the canvas pixels the eye just drew (its box):
+ * each pixel's distance from the background is kept as its weight, its colour the split: ember on the left, white-hot
+ * in the middle, cold blue on the right (drifting a little); then columns of pixels dragged down (a pixel sort) and a
+ * row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
+static const uint8_t HOLO_RGB[8][3] = {{255, 58, 20}, {255, 79, 46}, {255, 138, 102}, {255, 244, 230},
+                                       {127, 224, 255}, {34, 176, 255}, {42, 95, 214}, {42, 95, 214}};
+static uint16_t dfd_hue(uint32_t h)                 /* h: 0..1791 left (ember) .. middle (white-hot) .. right (cold) */
+{
+    uint32_t i = h >= 1792u ? 6u : h >> 8, f = h >= 1792u ? 255u : h & 255u;
+    const uint8_t *a = HOLO_RGB[i], *b = HOLO_RGB[i + 1u];
+    return RGB((a[0] * (256u - f) + b[0] * f) >> 8, (a[1] * (256u - f) + b[1] * f) >> 8, (a[2] * (256u - f) + b[2] * f) >> 8);
+}
+static int dfd_grey(uint16_t c)
+{
+    int32_t r = ((c >> 11) & 31) * 2, g = (c >> 5) & 63, b = (c & 31) * 2;
+    return (r > g ? r - g : g - r) <= 4 && (b > g ? b - g : g - b) <= 4;
+}
+static int32_t dfd_lum(uint16_t c) { return ((c >> 11) & 31) * 2 + ((c >> 5) & 63) + (c & 31) * 2; }   /* 0..187 */
+static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
+{
+    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x, y;
+    int32_t lb = dfd_lum(cv_bg), sp = r > 0 ? 1536 / r : 64, drift = DFD_S(fm1_ms / 40u) * 90 / 16384;
+    uint32_t t = fm1_ms / 6u, z = (fm1_ms / 50u) * 2654435761u;
+    if (ux.mono || (ux.pal[0] == 0x0000u && ux.pal[2] == 0xFFFFu) || (dfd_grey(ux.text) && dfd_grey(ux.theme)))   /* GREY, MONO: no colour */
+        return;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > (int32_t)cv_w) x1 = (int32_t)cv_w;
+    if (y1 > (int32_t)cv_h) y1 = (int32_t)cv_h;
+    if (x1 - x0 < 2 || y1 - y0 < 2)
+        return;
+    for (y = y0; y < y1; y++) {
+        uint16_t *row = &cv_px[(uint32_t)y * cv_w];
+        for (x = x0; x < x1; x++) {
+            uint16_t c = swap16(row[x]);
+            int32_t w = dfd_lum(c) - lb;
+            if (c == cv_bg)
+                continue;
+            w = (w < 0 ? -w : w) * 256 / 120;
+            if (w > 256) w = 256;
+            row[x] = swap16(ux_mix(cv_bg, dfd_hue((uint32_t)clamp(896 + (x - cx) * sp * 2 / 3 + drift, 0, 1791)), w * 100 / 256));
+        }
+    }
+    {                                                /* the drips: a column's pixel dragged down, fading */
+        uint32_t k, n = 2u + (uint32_t)tear / 12u, q = (fm1_ms / 70u) * 2246822519u + 1u;
+        for (k = 0; k < n; k++) {
+            int32_t px = x0 + (int32_t)((q >> 7) % (uint32_t)(x1 - x0)), py = y0 + (int32_t)((q >> 15) % (uint32_t)((y1 - y0) * 3 / 4 + 1));
+            int32_t len = 3 + (int32_t)((q >> 23) % (uint32_t)(r / 2 + 2 + tear / 8)), j;
+            uint16_t src = swap16(cv_px[(uint32_t)py * cv_w + (uint32_t)px]);
+            q = q * 1664525u + 1013904223u;
+            if (src == cv_bg)
+                continue;
+            for (j = 1; j < len && py + j < y1; j++) {
+                uint16_t *p = &cv_px[(uint32_t)(py + j) * cv_w + (uint32_t)px];
+                *p = swap16(ux_mix(swap16(*p), src, 90 - j * 80 / len));
+            }
+        }
+    }
+    if (tear > 0) {                                  /* the slices: rows of the box slid sideways */
+        uint32_t k, n = 1u + (uint32_t)tear / 48u;
+        for (k = 0; k < n; k++) {
+            int32_t h = 1 + (int32_t)((z >> 3) % 4u), ry = y0 + (int32_t)((z >> 9) % (uint32_t)(y1 - y0)), d = (int32_t)((z >> 17) % 9u) - 4, j;
+            d = d * (1 + tear / 64);
+            z = z * 1664525u + 1013904223u;
+            if (!d) d = 2;
+            for (j = 0; j < h && ry + j < y1; j++) {
+                uint16_t *row = &cv_px[(uint32_t)(ry + j) * cv_w];
+                if (d > 0) for (x = x1 - 1; x >= x0 + d; x--) row[x] = row[x - d];
+                else for (x = x0; x < x1 + d; x++) row[x] = row[x - d];
+            }
+        }
+        if ((z >> 5) & 1u) {                         /* a bar of foil */
+            int32_t bw = r / 2 + (int32_t)((z >> 11) % (uint32_t)(r + 1)), by = cy - r + (int32_t)((z >> 19) % (uint32_t)(2 * r + 1));
+            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, dfd_hue(t % 1792u));
+        }
+    }
+}
 static void dfd_eye_auto(int32_t cx, int32_t cy, int32_t r)   /* blinking, looking around, flashing on a roll; its mood */
 {
     uint32_t t = fm1_ms;
@@ -791,6 +1000,7 @@ static void dfd_eye_auto(int32_t cx, int32_t cy, int32_t r)   /* blinking, looki
     if (ang < 70) pupil += r / 20;                   /* wide, dreamy */
     dfd_eye(cx + jx, cy + jy, r, open, DFD_S(t / (uint32_t)sp) * (r / 6) / 16384 + jx,
             DFD_S(t / (uint32_t)(sp + 7) + 64u) * (r / 14) / 16384, pupil, fl > 60 || lv > 200 || ang > 200, ang);
+    dfd_holo(cx, cy, r, fl / 2 + (ang > 190 ? (ang - 190) * 2 : 0) + (lv > 220 ? 40 : 0) + ((t % 3100u) < 90u ? 60 : 0));
 }
 static void dfd_home_eye(void) { dfd_eye_auto(212, 30, 20); }
 
@@ -858,6 +1068,44 @@ static void dfd_graph(uint32_t g)
         cv_text_on(tx, dy + ds + 6, &AF_M, dfd.last_roll, T_TEXT, cv_bg);
         if (!small)
             cv_text_on(tx, 88, &AF_S, "TURN = ROLL", T_MID, cv_bg);
+    } else if (g == GR_DFD_LIVE) {
+        uint32_t age = fm1_ms - lv.drop_ms;
+        cv_text_on(tx, small ? 6 : 14, &AF_M, LV_MUTE[lv.mutes & 7u], lv.mutes ? T_ACCENT : T_TEXT, cv_bg);
+        str_cpy(b, "REPEAT ", sizeof b);
+        str_cpy(b + str_len(b), LV_REP[lv.rep & 3u], 6);
+        cv_text_on(tx, small ? 26 : 40, &AF_M, lv.rep ? b : lv.thr ? LV_THR[lv.thr & 3u] : "PLAY IT", T_THEME, cv_bg);
+        if (!small) {
+            uint32_t k;
+            for (k = 0; k < 4u; k++)                 /* the four tracks: lit in, dark out */
+                cv_rrect(tx + (int32_t)k * 22, 62, 18, 10, 3, (LV_MBITS[lv.mutes & 7u] >> k) & 1u ? ux_mix(cv_bg, T_TEXT, 20) : T_TEXT, cv_bg);
+            dfd_bar(tx + 92, 65, 36, lv.build);
+            cv_text_on(tx, 88, &AF_S, age < 900u ? "* DROP *" : "[OCT+] DROP", age < 900u ? T_ACCENT : T_MID, cv_bg);
+        }
+    } else if (g == GR_DFD_NEXT) {
+        const track_t *t = &trk[nx.tgt % NTRK];
+        str_cpy(b, "T", sizeof b);
+        b[1] = (char)('1' + nx.tgt % NTRK);
+        b[2] = 0;
+        str_cpy(b + 2, nx.on ? "  TRYING" : "  READY", 10);
+        cv_text_on(tx, small ? 6 : 14, &AF_M, NX_NAME[nx.pick & 3u], nx.pick ? T_ACCENT : T_TEXT, cv_bg);
+        cv_text_on(tx, small ? 26 : 40, &AF_S, b, T_MID, cv_bg);
+        if (!small) {                                /* the phrase: its first 16 steps, a dot a note */
+            uint32_t k, lo = 127, hi = 0;
+            for (k = 0; k < 16u; k++)
+                if (t->step[k].time == ST_NOTE && t->step[k].n) {
+                    if (t->step[k].note[0] < lo) lo = t->step[k].note[0];
+                    if (t->step[k].note[0] > hi) hi = t->step[k].note[0];
+                }
+            for (k = 0; k < 16u; k++) {
+                int32_t x = tx + (int32_t)k * 8;
+                cv_rect(x, 80, 6, 1, ux_mix(cv_bg, T_TEXT, 18));
+                if (t->step[k].time == ST_NOTE && t->step[k].n)
+                    dfd_disc(x + 3, 76 - (hi > lo ? (int32_t)(t->step[k].note[0] - lo) * 22 / (int32_t)(hi - lo) : 11), 3, T_TEXT);
+                else if (t->step[k].time == ST_TIE)
+                    cv_rect(x, 66, 6, 2, T_MID);
+            }
+            cv_text_on(tx, 88, &AF_S, "[OCT+] KEEP", T_MID, cv_bg);
+        }
     } else {
         cv_text_on(tx, small ? 6 : 14, &AF_M, SMP_ALL_NAMES[dfd.src % SMP_NALL], T_TEXT, cv_bg);
         str_cpy(b, STR_NAME[dfd.stretch % 5u], sizeof b);
@@ -894,6 +1142,18 @@ static void dfd_columns(uint32_t g)
         draw_column(1, "ACID", "ROLL", "", VAL(1u), -1, ICON_AUTO);
         draw_column(2, "MELODY", "ROLL", "", VAL(2u), -1, ICON_AUTO);
         draw_column(3, "SOUND", "ROLL", "", VAL(3u), -1, ICON_AUTO);
+    } else if (g == GR_DFD_LIVE) {
+        draw_column(0, "MUTES", LV_MCOL[lv.mutes & 7u], "", VAL(0u), (int32_t)lv.mutes * 1000 / 7, ICON_AUTO);
+        draw_column(1, "REPEAT", LV_REP[lv.rep & 3u], "", VAL(1u), (int32_t)lv.rep * 1000 / 3, ICON_AUTO);
+        fmt_int(v, lv.build);
+        draw_column(2, "BUILD", v, "%", VAL(2u), lv.build * 10, ICON_AUTO);
+        draw_column(3, "THROW", LV_THR[lv.thr & 3u], "", VAL(3u), (int32_t)lv.thr * 1000 / 3, ICON_AUTO);
+    } else if (g == GR_DFD_NEXT) {
+        static const char *const TN[4] = {"T1", "T2", "T3", "T4"};
+        draw_column(0, "PHRASE", NX_COL[nx.pick & 3u], "", VAL(0u), (int32_t)nx.pick * 1000 / 3, ICON_AUTO);
+        draw_column(1, "TRACK", TN[nx.tgt % NTRK], "", VAL(1u), (int32_t)(nx.tgt - 1u) * 500, ICON_AUTO);
+        draw_column(2, "-", "", "", VAL(2u), -1, ICON_AUTO);
+        draw_column(3, "NEW", "TURN", "", VAL(3u), -1, ICON_AUTO);
     } else {
         draw_column(0, "SOURCE", SMP_ALL_NAMES[dfd.src % SMP_NALL], "", VAL(0u), (int32_t)dfd.src * 1000 / (SMP_NALL - 1), ICON_AUTO);
         draw_column(1, "TIME", dfd.stretch ? (dfd.stretch == 4u ? "1/2" : dfd.stretch == 1u ? "1" : dfd.stretch == 2u ? "2" : "4") : "FREEZE",
@@ -907,5 +1167,7 @@ static void dfd_columns(uint32_t g)
 static uint32_t dfd_sig(void)
 {
     return (uint32_t)dfd.a * 3u + dfd.b * 37u + dfd.fusion * 101u + dfd.chaos * 1009u + dfd.mood * 7u + dfd.root * 17u + dfd.shape * 131u +
-           dfd.notes * 1301u + dfd.src * 13u + dfd.stretch * 19u + (uint32_t)(dfd.pitch + 12) * 23u + dfd.grain * 29u + dfd.roll_ms;
+           dfd.notes * 1301u + dfd.src * 13u + dfd.stretch * 19u + (uint32_t)(dfd.pitch + 12) * 23u + dfd.grain * 29u + dfd.roll_ms +
+           lv.mutes * 41u + lv.rep * 43u + lv.build * 47u + lv.thr * 53u + lv.drop_ms + nx.pick * 59u + nx.tgt * 61u + nx.seed * 67u +
+           nx.on * 71u + track_sig(&trk[nx.tgt % NTRK]);
 }
