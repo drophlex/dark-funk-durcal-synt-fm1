@@ -42,7 +42,7 @@ and feature of Felucca stays**; Dark Funk Durcal adds:
 | Path | What it is |
 |---|---|
 | [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) | **The installer.** Open it in Chrome or Edge with the FM-1 on USB and press *Install*. The firmware is inside it. It can also take you back to the official M-VAVE firmware. |
-| [`install/DarkFunkDurcal-1.8.2-dfd4.fwsc`](install/DarkFunkDurcal-1.8.2-dfd4.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_918. |
+| [`install/DarkFunkDurcal-1.8.2-dfd5.fwsc`](install/DarkFunkDurcal-1.8.2-dfd5.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_946. |
 | [`manual/DarkFunkDurcal-Manual-EN-ES.pdf`](manual/DarkFunkDurcal-Manual-EN-ES.pdf) | The full illustrated manual, English then Spanish (46 pages). |
 | [`manual/DarkFunkDurcal-Manual-ES.pdf`](manual/DarkFunkDurcal-Manual-ES.pdf) | The manual in Spanish only (23 pages). |
 | [`web/DarkFunkDurcalSynt.html`](web/DarkFunkDurcalSynt.html) | The web groovebox: 8 channels, styles A × B, dice, melody maker, acid tool, time-stretch, MIDI out / clock, `.mid` export, FM-1 screen preview. Works offline in any modern browser. |
@@ -100,13 +100,25 @@ classics and classic break *rhythms* programmed from scratch. Any `.mid` you own
 
 <p align="center"><img src="docs/images/midi_ritual.png" width="520" alt="MIDI Ritual"></p>
 
+## Play it in the browser
+
+- Web groovebox: https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html
+- MIDI Ritual: https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html
+
+## Identity and The Firmware Hub
+
+The package identity is **FM-1_946**, Dark Funk Durcal's own (it no longer uses Felucca's FM-1_918). The update loader
+inside the package is Felucca's, unchanged, so the FM-1 can always install the next firmware or go back to the official
+one. Both flash chips are supported (JEDEC `0x856014` and `0xB36014`). [`fmhub.json`](fmhub.json) describes the
+firmware for [The Firmware Hub](https://thefirmwarehub.com/); every GitHub release carries the `.fwsc`.
+
 ## Build the firmware yourself
 
 See [`firmware-src/BUILDING.md`](firmware-src/BUILDING.md) (JieLi toolchain + three AC79 SDK files). Then:
 
 ```sh
 cd firmware-src
-./build.sh --release 1.8.2-dfd4     # -> build/felucca-1.8.2-dfd4.fwsc (identity FM-1_918)
+./build.sh --release 1.8.2-dfd5 --identity FM-1_946   # -> build/felucca-1.8.2-dfd5.fwsc
 sh tests/run_tests.sh               # host tests: UI renders, audio goldens, tape echo, fuzzers
 ```
 

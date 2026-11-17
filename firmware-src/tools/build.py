@@ -389,6 +389,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string vX.Y")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
+    ap.add_argument("--identity", metavar="FM-1_9NN", help="the package identity instead of --release's FM-1_9XY "
+                    "(Dark Funk Durcal: its own number, FM-1_946)")
     a = ap.parse_args()
     name = "felucca.fwsc"
     if a.release:                   # one digit each: the identity has room for two (X.Y.Z and X.Y.Z.W keep X.Y's)
@@ -398,6 +400,10 @@ def main():
         PRODUCT = "FM-1_9" + m[1] + m[2]
         VERSION = "v" + a.release.lower()      # e.g. v1.0, v1.1-rc1
         name = f"felucca-{a.release}.fwsc"
+    if a.identity:
+        if not re.fullmatch(r"FM-1_\d{3,10}", a.identity):
+            raise SystemExit(f"--identity {a.identity}: use FM-1_ and digits")
+        PRODUCT = a.identity
     if not (FW / "engines" / "src" / "felucca_engine.h").exists():
         raise SystemExit("firmware/engines is empty: the Felucca-Engines submodule "
                          "(git submodule update --init, or clone with --recurse-submodules)")

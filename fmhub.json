@@ -1,0 +1,11 @@
+{
+  "what": "A dark, easy groovebox for acid lines and chopped breaks. RITUAL blends two of 11 styles into a full 4-track song with one button; MELODY writes tunes that are always in key; DICE re-rolls one part at a time; easy time-stretch, a three-head tape echo and an eye that reacts to the music.",
+  "author": "Polaris Sound Lab",
+  "kinds": ["groove"],
+  "play": "https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html",
+  "editor": "https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html",
+  "cheat": "https://github.com/drophlex/dark-funk-durcal-synt-fm1/blob/main/manual/DarkFunkDurcal-Manual-EN-ES.pdf",
+  "image": "docs/images/fmhub-card.png",
+  "color": "#E8613F",
+  "sounds": "CC0: Versilian Studios VSCO-2 Community Edition and VCSL samples (piano, flute, sax, kept from Felucca); the FM voice bank and sounds/DarkFunkDurcal_DX7.syx are own"
+}
