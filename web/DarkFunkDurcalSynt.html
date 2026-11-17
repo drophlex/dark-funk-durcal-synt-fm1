@@ -1677,27 +1677,27 @@ applyLang();
 // warm on the left (ember orange, rose), white-hot in the middle, cold on the right (cyan, steel blue); columns of
 // pixels dragged down like a pixel sort, blocks of mosaic, a soft bloom; all of it breathing with the music
 const SMEAR={t:0,burst:0,seed:1,cols:[],blocks:[]};
-const SM_W=['#ff4a1c','#ff6b3d','#ff2f6d','#ffb38a'],SM_C=['#3ad7ff','#2a8bff','#7fe9ff','#5aa0c8'],SM_H='#fff4e6';
+const SM_W=['#c2412f','#e8613f','#8f2e22','#ebe2cd'],SM_C=['#ebe2cd','#bdb39d','#c2412f','#71695b'],SM_H='#ebe2cd';   // the original colours: bone and blood
 (function(){
   const NS='http://www.w3.org/2000/svg',svg=$('#eyeSvg'),defs=svg.querySelector('defs');
   const mk=(tag,at,par)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(par)par.appendChild(e);return e};
   const g=mk('linearGradient',{id:'smG',gradientUnits:'userSpaceOnUse',x1:-300,y1:0,x2:300,y2:0},defs);
-  [['0','#ff3d1f'],['.22','#ff6a4a'],['.38','#ffc7a3'],['.5',SM_H],['.62','#bff3ff'],['.8','#39c8ff'],['1','#2a5fd6']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},g));
+  [['0','#ebe2cd'],['1','#ebe2cd']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},g));
   const hc=mk('radialGradient',{id:'smHot'},defs);
-  [['0','#ffffff',.95],['.25','#fff1e0',.55],['.6','#ff9a6a',.12],['1','#2a8bff',0]].forEach(([o,c,a])=>mk('stop',{offset:o,'stop-color':c,'stop-opacity':a},hc));
+  [['0','#ebe2cd',.22],['.6','#ebe2cd',.04],['1','#ebe2cd',0]].forEach(([o,c,a])=>mk('stop',{offset:o,'stop-color':c,'stop-opacity':a},hc));
   // drips: vertical bands of noise push columns of the picture down; a soft sideways bloom under it all
   const f=mk('filter',{id:'smF',x:'-25%',y:'-25%',width:'150%',height:'160%','color-interpolation-filters':'sRGB'},defs);
   SMEAR.turb=mk('feTurbulence',{type:'fractalNoise',baseFrequency:'0.07 0.00001',numOctaves:1,seed:1,result:'n'},f);
   mk('feColorMatrix',{in:'n',type:'matrix',values:'0 0 0 0 .5  1 0 0 0 0  0 0 0 0 0  0 0 0 0 1',result:'ny'},f);
   SMEAR.disp=mk('feDisplacementMap',{in:'SourceGraphic',in2:'ny',scale:0,xChannelSelector:'R',yChannelSelector:'G',result:'d'},f);
   SMEAR.blur=mk('feGaussianBlur',{in:'d',stdDeviation:'6 1',result:'b'},f);
-  mk('feColorMatrix',{in:'b',type:'matrix',values:'1.3 0 0 0 0  0 1.1 0 0 0  0 0 1.2 0 0  0 0 0 .8 0',result:'g'},f);
+  mk('feColorMatrix',{in:'b',type:'matrix',values:'1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .55 0',result:'g'},f);
   const m=mk('feMerge',{},f);['g','d'].forEach(x=>mk('feMergeNode',{in:x},m));
   $('#sigil').setAttribute('stroke','url(#smG)');
   ['#tendrils','#dots','#runes','#drip'].forEach(s=>{const e=$(s);if(e)e.setAttribute('fill','url(#smG)')});
   $('#tendrils').querySelectorAll('[fill]').forEach(e=>e.setAttribute('fill','url(#smG)'));
   $('#haloC').setAttribute('fill','url(#smHot)');
-  const cg=mk('radialGradient',{id:'smCore'},defs);[['0','#6b4a40'],['.45','#2a1d1a'],['1','#0e0c0b']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},cg));
+  const cg=mk('radialGradient',{id:'smCore'},defs);[['0','#0e0c0b'],['1','#0e0c0b']].forEach(([o,c])=>mk('stop',{offset:o,'stop-color':c},cg));
   const disc0=$('#sigil').querySelector('circle[r="140"]');if(disc0)disc0.setAttribute('fill','url(#smCore)');
   // the pixel-sort columns and the mosaic blocks: behind the sigil (over the halo) and over it
   SMEAR.back=mk('g',{id:'smBack',style:'mix-blend-mode:screen'});$('#haloC').after(SMEAR.back);
@@ -1713,7 +1713,7 @@ function smearFrame(now){
   SMEAR.burst*=.9;const gl=Math.max(SMEAR.burst,stutter?.9:0,(typeof LIVE!=='undefined'&&LIVE.build)?.6:0);
   SMEAR.t+=.01+lv*.03;
   $('#smG').setAttribute('gradientTransform',`translate(${(Math.sin(SMEAR.t*.7)*40).toFixed(1)} 0)`);
-  SMEAR.glow.setAttribute('opacity',(.22+lv*.45+fl*.4).toFixed(2));SMEAR.glow.setAttribute('rx',(130+lv*60).toFixed(0));
+  SMEAR.glow.setAttribute('opacity',(.08+lv*.18+fl*.25).toFixed(2));SMEAR.glow.setAttribute('rx',(130+lv*60).toFixed(0));
   $('#haloC').setAttribute('r',(230+lv*70+fl*60).toFixed(0));$('#haloC').setAttribute('opacity',(.75+lv*.25).toFixed(2));
   if(Math.random()<.05+gl*.4)SMEAR.turb.setAttribute('seed',++SMEAR.seed);
   const sc=6+lv*18+gl*70;SMEAR.disp.setAttribute('scale',sc.toFixed(1));
@@ -1742,9 +1742,7 @@ function smearCanvas(g,x,y,w,h,amt){
   g.save();g.setTransform(1,0,0,1,0,0);
   const gr=g.createLinearGradient(x,0,x+w,0);
   [[0,'#ff3d1f'],[.25,'#ff7a55'],[.42,'#ffd9c2'],[.5,'#ffffff'],[.6,'#d2f5ff'],[.78,'#39c8ff'],[1,'#2a5fd6']].forEach(([o,col])=>gr.addColorStop(o,col));
-  g.globalCompositeOperation='multiply';g.fillStyle=gr;g.fillRect(x,y,w,h);
-  const rg=g.createRadialGradient(x+w/2,y+h/2,0,x+w/2,y+h/2,Math.min(w,h)*.5);rg.addColorStop(0,'rgba(255,250,240,'+(.3+amt*.4)+')');rg.addColorStop(1,'rgba(255,160,110,0)');
-  g.globalCompositeOperation='screen';g.fillStyle=rg;g.fillRect(x,y,w,h);
+  void gr;   // (the original colours: no tint)
   g.globalCompositeOperation='source-over';
   const n=Math.floor(3+amt*26);
   for(let k=0;k<n;k++){const cw=1+Math.floor(Math.random()*3),cx=x+Math.floor(Math.random()*(w-cw)),sy=y+Math.floor(Math.random()*h*.8),sh=1+Math.floor(Math.random()*3),len=h*(.05+Math.random()*(.15+amt*.5));

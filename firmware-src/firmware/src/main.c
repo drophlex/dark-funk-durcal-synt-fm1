@@ -157,10 +157,10 @@ static void fm1_main(void)
     }
     autosave_boot(boot_clean);                /* (1.2) the last session's music, under the splash */
     if (boot_clean && !(ui_prefs & PREF_ANIM_OFF)) {   /* Dark Funk Durcal: the animated eye (ui_draw.c), bounded:
-                                                * at most 700 frames even if the ms tick stood still */
+                                                * at most 1000 frames even if the ms tick stood still */
         uint32_t t0 = fm1_ms, t = 0, frames = 0;
         lcd_fill(0, 0, 240, 240, T_BG);
-        while (t < DFD_SPLASH_MS + 500u && frames < 700u) {
+        while (t < DFD_SPLASH_MS + 500u && frames < 1000u) {
             draw_splash_frame(t);
             fm1_wdt_feed();
             fm1_delay_ms(8);

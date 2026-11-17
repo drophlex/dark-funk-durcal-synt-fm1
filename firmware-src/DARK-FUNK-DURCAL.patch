@@ -22,10 +22,10 @@ index b835dec..2229a9e 100644
      "LBLLL",                     /* 3 LOFI: PULSE LD, WAVE BASS, ARP 8BIT, WAVE LEAD, STEP LEAD */
 diff --git a/firmware/src/dfd.c b/firmware/src/dfd.c
 new file mode 100644
-index 0000000..626d8dd
+index 0000000..8a47a7d
 --- /dev/null
 +++ b/firmware/src/dfd.c
-@@ -0,0 +1,1173 @@
+@@ -0,0 +1,1152 @@
 +/* SPDX-License-Identifier: GPL-3.0-only
 + * Dark Funk Durcal Synt (Polaris Sound Lab), on Felucca 1.8.2 (Hügelton Instruments).
 + *
@@ -925,18 +925,8 @@ index 0000000..626d8dd
 +        dfd_line(cx - W * 2 / 3, cy - H - 2, cx + W * 2 / 3, cy - H - 2, 1, faint);
 +    }
 +}
-+/* SMEAR (dfd6): the eye as light through a broken screen. A pass over the canvas pixels the eye just drew (its box):
-+ * each pixel's distance from the background is kept as its weight, its colour the split: ember on the left, white-hot
-+ * in the middle, cold blue on the right (drifting a little); then columns of pixels dragged down (a pixel sort) and a
-+ * row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
-+static const uint8_t HOLO_RGB[8][3] = {{255, 58, 20}, {255, 79, 46}, {255, 138, 102}, {255, 244, 230},
-+                                       {127, 224, 255}, {34, 176, 255}, {42, 95, 214}, {42, 95, 214}};
-+static uint16_t dfd_hue(uint32_t h)                 /* h: 0..1791 left (ember) .. middle (white-hot) .. right (cold) */
-+{
-+    uint32_t i = h >= 1792u ? 6u : h >> 8, f = h >= 1792u ? 255u : h & 255u;
-+    const uint8_t *a = HOLO_RGB[i], *b = HOLO_RGB[i + 1u];
-+    return RGB((a[0] * (256u - f) + b[0] * f) >> 8, (a[1] * (256u - f) + b[1] * f) >> 8, (a[2] * (256u - f) + b[2] * f) >> 8);
-+}
++/* SMEAR (dfd6; dfd8: in the eye's original colours): a pass over the canvas pixels the eye just drew (its box):
++ * columns of pixels dragged down (a pixel sort) and a row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
 +static int dfd_grey(uint16_t c)
 +{
 +    int32_t r = ((c >> 11) & 31) * 2, g = (c >> 5) & 63, b = (c & 31) * 2;
@@ -945,7 +935,7 @@ index 0000000..626d8dd
 +static int32_t dfd_lum(uint16_t c) { return ((c >> 11) & 31) * 2 + ((c >> 5) & 63) + (c & 31) * 2; }   /* 0..187 */
 +static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
 +{
-+    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x, y;
++    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x;
 +    int32_t lb = dfd_lum(cv_bg), sp = r > 0 ? 1536 / r : 64, drift = DFD_S(fm1_ms / 40u) * 90 / 16384;
 +    uint32_t t = fm1_ms / 6u, z = (fm1_ms / 50u) * 2654435761u;
 +    if (ux.mono || (ux.pal[0] == 0x0000u && ux.pal[2] == 0xFFFFu) || (dfd_grey(ux.text) && dfd_grey(ux.theme)))   /* GREY, MONO: no colour */
@@ -956,18 +946,7 @@ index 0000000..626d8dd
 +    if (y1 > (int32_t)cv_h) y1 = (int32_t)cv_h;
 +    if (x1 - x0 < 2 || y1 - y0 < 2)
 +        return;
-+    for (y = y0; y < y1; y++) {
-+        uint16_t *row = &cv_px[(uint32_t)y * cv_w];
-+        for (x = x0; x < x1; x++) {
-+            uint16_t c = swap16(row[x]);
-+            int32_t w = dfd_lum(c) - lb;
-+            if (c == cv_bg)
-+                continue;
-+            w = (w < 0 ? -w : w) * 256 / 120;
-+            if (w > 256) w = 256;
-+            row[x] = swap16(ux_mix(cv_bg, dfd_hue((uint32_t)clamp(896 + (x - cx) * sp * 2 / 3 + drift, 0, 1791)), w * 100 / 256));
-+        }
-+    }
++    (void)lb; (void)sp; (void)drift; (void)t;           /* (the original colours: no recolouring, the drips and tears only) */
 +    {                                                /* the drips: a column's pixel dragged down, fading */
 +        uint32_t k, n = 2u + (uint32_t)tear / 12u, q = (fm1_ms / 70u) * 2246822519u + 1u;
 +        for (k = 0; k < n; k++) {
@@ -998,7 +977,7 @@ index 0000000..626d8dd
 +        }
 +        if ((z >> 5) & 1u) {                         /* a bar of foil */
 +            int32_t bw = r / 2 + (int32_t)((z >> 11) % (uint32_t)(r + 1)), by = cy - r + (int32_t)((z >> 19) % (uint32_t)(2 * r + 1));
-+            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, dfd_hue(t % 1792u));
++            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, (z >> 9) & 1u ? T_TEXT : T_REC);
 +        }
 +    }
 +}
@@ -1389,7 +1368,7 @@ index d2bcf92..9f4d44e 100644
      rt = rt == 1 || rt == 2 ? rt : 0;
      hl.side = 0;
 diff --git a/firmware/src/main.c b/firmware/src/main.c
-index 69ba568..87dc364 100644
+index 69ba568..bf6bb2a 100644
 --- a/firmware/src/main.c
 +++ b/firmware/src/main.c
 @@ -156,10 +156,25 @@ static void fm1_main(void)
@@ -1401,10 +1380,10 @@ index 69ba568..87dc364 100644
 -        master_poll();
 -    }
 +    if (boot_clean && !(ui_prefs & PREF_ANIM_OFF)) {   /* Dark Funk Durcal: the animated eye (ui_draw.c), bounded:
-+                                                * at most 700 frames even if the ms tick stood still */
++                                                * at most 1000 frames even if the ms tick stood still */
 +        uint32_t t0 = fm1_ms, t = 0, frames = 0;
 +        lcd_fill(0, 0, 240, 240, T_BG);
-+        while (t < DFD_SPLASH_MS + 500u && frames < 700u) {
++        while (t < DFD_SPLASH_MS + 500u && frames < 1000u) {
 +            draw_splash_frame(t);
 +            fm1_wdt_feed();
 +            fm1_delay_ms(8);
@@ -1579,7 +1558,7 @@ index e63d369..b344a16 100644
          return !chain_busy() && (c == 0u ? !seq_is_empty(TSEL) || motion_count(TSEL) : c == 1u ? 1 :
                                   c == 2u ? ui.song_row < chain_config.count : chain_config.count != 0u);
 diff --git a/firmware/src/ui_draw.c b/firmware/src/ui_draw.c
-index 762d5a9..2f24680 100644
+index 762d5a9..ccf8bdf 100644
 --- a/firmware/src/ui_draw.c
 +++ b/firmware/src/ui_draw.c
 @@ -992,6 +992,10 @@ static void draw_columns(void)
@@ -1593,7 +1572,7 @@ index 762d5a9..2f24680 100644
      if (cur_page()->graph == GR_SONG) {             /* SECTION, TRACK, its PAT (A..D, -), REPS (the section's) */
          uint32_t row = ui.song_row < CHAIN_ROWS ? ui.song_row : CHAIN_ROWS - 1u, k = ui.song_trk % NTRK, sl;
          int used = row < chain_config.count;
-@@ -1386,6 +1390,173 @@ static void draw_splash(void)
+@@ -1386,6 +1390,187 @@ static void draw_splash(void)
      lcd_sync();
  }
  
@@ -1603,7 +1582,7 @@ index 762d5a9..2f24680 100644
 + * main.c draws it frame by frame for DFD_SPLASH_MS: dots, the ring, the triangle, the tendrils grow, the eye
 + * opens, the title is typed and the music line fades in. Canvas only (two bands: 240 x 124 and 240 x 110),
 + * integer maths, bounded loops. Not with MENU > ANIM OFF or after a crash (main.c). */
-+#define DFD_SPLASH_MS 4400u
++#define DFD_SPLASH_MS 6600u   /* dfd6: + the "buy me a coffee" card (drophlex@gmail.com, PayPal) at the end */
 +static const int16_t DFD_SIN[256] = {0,402,804,1205,1606,2006,2404,2801,3196,3590,3981,4370,4756,5139,5520,5897,6270,6639,7005,7366,7723,8076,8423,8765,9102,9434,9760,10080,10394,10702,11003,11297,11585,11866,12140,12406,12665,12916,13160,13395,13623,13842,14053,14256,14449,14635,14811,14978,15137,15286,15426,15557,15679,15791,15893,15986,16069,16143,16207,16261,16305,16340,16364,16379,16384,16379,16364,16340,16305,16261,16207,16143,16069,15986,15893,15791,15679,15557,15426,15286,15137,14978,14811,14635,14449,14256,14053,13842,13623,13395,13160,12916,12665,12406,12140,11866,11585,11297,11003,10702,10394,10080,9760,9434,9102,8765,8423,8076,7723,7366,7005,6639,6270,5897,5520,5139,4756,4370,3981,3590,3196,2801,2404,2006,1606,1205,804,402,0,-402,-804,-1205,-1606,-2006,-2404,-2801,-3196,-3590,-3981,-4370,-4756,-5139,-5520,-5897,-6270,-6639,-7005,-7366,-7723,-8076,-8423,-8765,-9102,-9434,-9760,-10080,-10394,-10702,-11003,-11297,-11585,-11866,-12140,-12406,-12665,-12916,-13160,-13395,-13623,-13842,-14053,-14256,-14449,-14635,-14811,-14978,-15137,-15286,-15426,-15557,-15679,-15791,-15893,-15986,-16069,-16143,-16207,-16261,-16305,-16340,-16364,-16379,-16384,-16379,-16364,-16340,-16305,-16261,-16207,-16143,-16069,-15986,-15893,-15791,-15679,-15557,-15426,-15286,-15137,-14978,-14811,-14635,-14449,-14256,-14053,-13842,-13623,-13395,-13160,-12916,-12665,-12406,-12140,-11866,-11585,-11297,-11003,-10702,-10394,-10080,-9760,-9434,-9102,-8765,-8423,-8076,-7723,-7366,-7005,-6639,-6270,-5897,-5520,-5139,-4756,-4370,-3981,-3590,-3196,-2801,-2404,-2006,-1606,-1205,-804,-402};
 +#define DFD_S(a) ((int32_t)DFD_SIN[(uint32_t)(a) & 255u])
 +#define DFD_C(a) ((int32_t)DFD_SIN[((uint32_t)(a) + 64u) & 255u])
@@ -1752,13 +1731,27 @@ index 762d5a9..2f24680 100644
 +        dfd_text_c(66, &AF_S, "SEARCH IT ON SPOTIFY, YOUTUBE", c, bg);
 +        dfd_text_c(80, &AF_S, "AND EVERY AUDIO PLATFORM", c, bg);
 +    }
-+    if (t >= 3500) {                                  /* who made it */
++    if (t >= 3500 && t < 4900) {                      /* who made it */
 +        uint16_t c = t > 3700 ? bone : faint;
 +        cv_rect(40, 43, 160, 1, faint);
 +        dfd_text_c(48, &AF_S, "CREATED AT POLARIS SOUND LAB", c, bg);
 +        dfd_text_c(63, &AF_S, "MERIDA, YUCATAN, MEXICO", t > 3700 ? ux_mix(T_BG, T_TEXT, 70) : faint, bg);
 +        dfd_text_c(80, &AF_S, "INSTAGRAM @polaris.sound.lab", t > 3700 ? red : faint, bg);
 +        dfd_text_c(95, &AF_S, "YOUTUBE @PolarisSoundLab", t > 3700 ? red : faint, bg);
++    }
++    if (t >= 4900) {                                  /* dfd6: if you like it, buy me a coffee (only here, at boot) */
++        uint16_t c = t > 5100 ? bone : faint, sub = t > 5100 ? ux_mix(T_BG, T_TEXT, 70) : faint;
++        int32_t bw = text_w(&AF_S, "Pay") + text_w(&AF_S, "Pal") + 12, ew = text_w(&AF_S, "drophlex@gmail.com"), x0 = (240 - bw - 8 - ew) / 2;
++        cv_rect(40, 43, 160, 1, faint);
++        dfd_text_c(48, &AF_S, "IF YOU LIKE IT, BUY ME A COFFEE", c, bg);
++        dfd_text_c(63, &AF_S, "SI TE GUSTA, INVITAME UN CAFE", sub, bg);
++        if (t > 5100) {                               /* the PayPal mark: a white tag, Pay in navy, Pal in sky blue */
++            uint16_t white = RGB(255, 255, 255), navy = RGB(0, 48, 135), sky = RGB(0, 156, 222);
++            cv_rrect(x0, 78, bw, 17, 4, white, bg);
++            cv_text_on(x0 + 6, 80, &AF_S, "Pay", navy, white);
++            cv_text_on(x0 + 6 + text_w(&AF_S, "Pay"), 80, &AF_S, "Pal", sky, white);
++            cv_text_on(x0 + bw + 8, 80, &AF_S, "drophlex@gmail.com", red, bg);
++        }
 +    }
 +    cv_blit(0, 130);
 +    lcd_sync();
@@ -2213,7 +2206,7 @@ index fec7d0c..212ba8f 100644
      go_title("EDIT 1"); frame();
      for (i = 0; i < 12u && ok; i++) {                   /* EDIT's pages: only the ones the engine shows */
 diff --git a/tests/ui_render.c b/tests/ui_render.c
-index 6563b2a..41a278c 100644
+index 6563b2a..a575513 100644
 --- a/tests/ui_render.c
 +++ b/tests/ui_render.c
 @@ -803,7 +803,7 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
@@ -2268,7 +2261,7 @@ index 6563b2a..41a278c 100644
 -    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT"};   /* (NIGHT: #50, to review) */
 +    static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT", "DURCAL"};   /* (DURCAL: the manual's pictures) */   /* (NIGHT: #50, to review) */
 +    if (getenv("DFD_SPLASH")) {                      /* Dark Funk Durcal: the boot animation's frames, OUT/ppm/DURCAL_splash_<ms> */
-+        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600};
++        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600, 5600, 6400};
 +        char nm[32];
 +        state();
 +        pal(UI_DURCAL_INDEX);

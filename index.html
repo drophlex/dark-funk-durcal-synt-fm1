@@ -12,14 +12,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#0e0c0b;--ink2:#171311;--ink3:#211b18;--bone:#ebe2cd;--bone2:#bdb39d;--dim:#857b6a;--line:#3a312b;--ember:#ff4a1c;--rose:#ff6b6b;--cold:#2fb8ff;--blood:#c2412f}
+:root{--ink:#0e0c0b;--ink2:#171311;--ink3:#211b18;--bone:#ebe2cd;--bone2:#bdb39d;--dim:#857b6a;--line:#3a312b;--ember:#c2412f;--rose:#ff6b6b;--cold:#e8613f;--blood:#c2412f}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--ink);color:var(--bone);font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;font-size:19px;line-height:1.45;letter-spacing:.02em;overflow-x:hidden}
 a{color:inherit}
 img,video{max-width:100%;display:block}
 .wrap{max-width:1120px;margin:0 auto;padding:0 22px}
-.split{background:linear-gradient(90deg,var(--ember),#ffd2b8 45%,#fff4e6 50%,#bff3ff 55%,var(--cold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.split{background:linear-gradient(90deg,#ebe2cd,#ebe2cd);-webkit-background-clip:text;background-clip:text;color:transparent}
 h1,h2,h3{font-family:Cinzel,Georgia,serif;font-weight:700;letter-spacing:.08em;line-height:1.15}
 h2{font-size:clamp(26px,4vw,40px);text-align:center;margin-bottom:10px}
 .kick{font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--bone2);text-align:center;margin-bottom:8px}
@@ -37,7 +37,7 @@ section{padding:70px 0;border-top:1px solid var(--line)}
 @media(max-width:820px){.nav{display:none}.lang{margin-left:auto}}
 /* hero */
 .hero{position:relative;padding:28px 0 60px;text-align:center;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:-20% -10% auto;height:120%;background:radial-gradient(ellipse at 30% 30%,rgba(255,74,28,.18),transparent 55%),radial-gradient(ellipse at 70% 30%,rgba(47,184,255,.16),transparent 55%);pointer-events:none}
+.hero::before{content:"";position:absolute;inset:-20% -10% auto;height:120%;background:radial-gradient(ellipse at 50% 25%,rgba(194,65,47,.16),transparent 60%),radial-gradient(ellipse at 50% 30%,rgba(235,226,205,.08),transparent 55%);pointer-events:none}
 .hero video{width:min(760px,100%);margin:0 auto;border-radius:14px;mask-image:radial-gradient(ellipse at center,#000 62%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse at center,#000 62%,transparent 100%)}
 .hero h1{font-size:clamp(30px,6vw,64px);margin-top:-6px}
 .tag{font-size:clamp(18px,2.6vw,24px);letter-spacing:.32em;text-transform:uppercase;margin:10px 0 6px}
@@ -47,14 +47,14 @@ section{padding:70px 0;border-top:1px solid var(--line)}
 .btn b{font-family:Cinzel,serif;font-size:19px;letter-spacing:.1em}
 .btn span{font-size:14px;color:var(--bone2);letter-spacing:.06em}
 .btn:hover{transform:translateY(-2px);border-color:var(--bone2)}
-.btn.main{background:linear-gradient(90deg,#ff4a1c,#ff8a66 40%,#fff4e6 50%,#7fe0ff 60%,#2fb8ff);color:#140f0d;border:none;box-shadow:0 10px 40px rgba(255,120,80,.25),0 10px 40px rgba(47,184,255,.2)}
+.btn.main{background:var(--bone);color:#140f0d;border:none;box-shadow:0 10px 40px rgba(194,65,47,.3)}
 .btn.main span{color:#3a2a22}
-.btn.warm{border-color:rgba(255,74,28,.55)}.btn.cold{border-color:rgba(47,184,255,.55)}
+.btn.warm{border-color:rgba(194,65,47,.7)}.btn.cold{border-color:rgba(194,65,47,.7)}
 /* features */
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid{grid-template-columns:1fr}}
 .card{background:var(--ink2);border:1px solid var(--line);border-radius:14px;padding:20px 20px 18px;position:relative;overflow:hidden}
-.card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--ember),#fff4e6,var(--cold));opacity:.8}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--ember);opacity:.8}
 .card .ic{font-size:26px;margin-bottom:6px}
 .card h3{font-size:18px;margin-bottom:6px}
 .card p{color:var(--bone2);font-size:17px}
@@ -66,7 +66,7 @@ section{padding:70px 0;border-top:1px solid var(--line)}
 .guide.show{display:grid}@media(max-width:860px){.guide.show{grid-template-columns:1fr}}
 ol.steps{list-style:none;counter-reset:s}
 ol.steps li{counter-increment:s;display:grid;grid-template-columns:46px 1fr;gap:12px;margin-bottom:18px}
-ol.steps li::before{content:counter(s);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-weight:700;border:2px solid transparent;background:linear-gradient(var(--ink),var(--ink)) padding-box,linear-gradient(90deg,var(--ember),var(--cold)) border-box}
+ol.steps li::before{content:counter(s);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-weight:700;border:2px solid transparent;background:linear-gradient(var(--ink),var(--ink)) padding-box,linear-gradient(90deg,var(--ember),var(--ember)) border-box}
 ol.steps b{display:block;font-size:20px;letter-spacing:.04em}
 ol.steps span{color:var(--bone2);font-size:17px}
 ol.steps span b{display:inline;font-size:inherit;letter-spacing:inherit;color:var(--bone)}
@@ -139,7 +139,7 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
     <div class="card"><div class="ic">⚡</div><h3><span data-es>Modo en vivo</span><span data-en>Live mode</span></h3><p><span data-es>8 pads: mutes, fill, stutter, build y drop. Escenas que cambian al final del compás, sin cortes.</span><span data-en>8 pads: mutes, fill, stutter, build and drop. Scenes that switch at the end of the bar, no gaps.</span></p></div>
     <div class="card"><div class="ic">✦</div><h3><span data-es>3 ideas para tu melodía</span><span data-en>3 ideas for your melody</span></h3><p><span data-es>NEXT PHRASE te da una respuesta, una variación y una tensión de lo que tocaste. Te quedas con la que te guste.</span><span data-en>NEXT PHRASE gives you an answer, a variation and a tension of what you played. Keep the one you like.</span></p></div>
     <div class="card"><div class="ic">⇢</div><h3><span data-es>Tu MIDI, a tu DAW</span><span data-en>Your MIDI, into your DAW</span></h3><p><span data-es>Exporta .mid desde la web, arrastra el MIDI del plugin a Ableton, o carga cualquier .mid al FM-1.</span><span data-en>Export .mid from the web, drag the plugin’s MIDI into Ableton, or load any .mid into the FM-1.</span></p></div>
-    <div class="card"><div class="ic">◬</div><h3><span data-es>Un ojo que siente la música</span><span data-en>An eye that feels the music</span></h3><p><span data-es>Luz cálida y fría, chorreados de pixel y glitch que crecen con el volumen. Tranquilo en ambient, furioso en breakcore.</span><span data-en>Warm and cold light, pixel drips and glitches that grow with the volume. Calm in ambient, furious in breakcore.</span></p></div>
+    <div class="card"><div class="ic">◬</div><h3><span data-es>Un ojo que siente la música</span><span data-en>An eye that feels the music</span></h3><p><span data-es>Chorreados de pixel y glitch que crecen con el volumen. Tranquilo en ambient, furioso en breakcore.</span><span data-en>Pixel drips and glitches that grow with the volume. Calm in ambient, furious in breakcore.</span></p></div>
   </div>
 </div></section>
 
@@ -200,12 +200,12 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
   <p class="sub"><span data-es>Los que dicen “abrir” funcionan directo en el navegador.</span><span data-en>The “open” ones work straight in the browser.</span></p>
   <div class="dl">
     <a href="web/DarkFunkDurcalSynt.html"><span class="i">▶</span><span><b><span data-es>Groovebox web · abrir</span><span data-en>Web groovebox · open</span></b><span data-es>Compu o celular, sin instalar.</span><span data-en>Computer or phone, nothing to install.</span></span></a>
-    <a href="install/DarkFunkDurcal-Installer.html"><span class="i">⬇</span><span><b><span data-es>Instalador FM-1 · abrir</span><span data-en>FM-1 installer · open</span></b><span data-es>Firmware 1.8.2-dfd7, Chrome o Edge.</span><span data-en>Firmware 1.8.2-dfd7, Chrome or Edge.</span></span></a>
+    <a href="install/DarkFunkDurcal-Installer.html"><span class="i">⬇</span><span><b><span data-es>Instalador FM-1 · abrir</span><span data-en>FM-1 installer · open</span></b><span data-es>Firmware 1.8.2-dfd8, Chrome o Edge.</span><span data-en>Firmware 1.8.2-dfd8, Chrome or Edge.</span></span></a>
     <a href="web/DarkFunkDurcal-MIDI-Ritual.html"><span class="i">⇢</span><span><b><span data-es>MIDI Ritual · abrir</span><span data-en>MIDI Ritual · open</span></b><span data-es>.mid al FM-1 y del FM-1 a .mid.</span><span data-en>.mid into the FM-1 and back.</span></span></a>
     <a href="manual/DarkFunkDurcal-Manual-ES.pdf"><span class="i">📘</span><span><b><span data-es>Manual en español (PDF)</span><span data-en>Manual in Spanish (PDF)</span></b><span data-es>Cada paso, con imágenes.</span><span data-en>Every step, with pictures.</span></span></a>
     <a href="manual/DarkFunkDurcal-Manual-EN-ES.pdf"><span class="i">📗</span><span><b><span data-es>Manual inglés + español (PDF)</span><span data-en>Manual English + Spanish (PDF)</span></b><span data-es>58 páginas: web, FM-1 y plugin.</span><span data-en>58 pages: web, FM-1 and plugin.</span></span></a>
     <a href="midi/DarkFunkDurcal-MIDI-Pack.zip"><span class="i">♫</span><span><b>MIDI Pack (.zip)</b><span data-es>50 secuencias: estilos, clásicos y breaks.</span><span data-en>50 sequences: styles, classics and breaks.</span></span></a>
-    <a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcal-1.8.2-dfd7.fwsc"><span class="i">⚙</span><span><b><span data-es>Firmware .fwsc</span><span data-en>Firmware .fwsc</span></b><span data-es>Para usuarios avanzados (identidad FM-1_946).</span><span data-en>For advanced users (identity FM-1_946).</span></span></a>
+    <a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcal-1.8.2-dfd8.fwsc"><span class="i">⚙</span><span><b><span data-es>Firmware .fwsc</span><span data-en>Firmware .fwsc</span></b><span data-es>Para usuarios avanzados (identidad FM-1_946).</span><span data-en>For advanced users (identity FM-1_946).</span></span></a>
     <a href="plugin.html"><span class="i">🎹</span><span><b><span data-es>Plugin VST3 / AU · Mac y Windows</span><span data-en>VST3 / AU plugin · Mac and Windows</span></b><span data-es>Instalación de un clic · gratis y abierto.</span><span data-en>One-click install · free and open.</span></span></a>
     <a href="sounds/DarkFunkDurcal_DX7.syx"><span class="i">◈</span><span><b><span data-es>Banco FM (DX7 .syx)</span><span data-en>FM bank (DX7 .syx)</span></b><span data-es>32 voces para Dexed o cualquier DX7.</span><span data-en>32 voices for Dexed or any DX7.</span></span></a>
   </div>

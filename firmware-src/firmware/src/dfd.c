@@ -897,18 +897,8 @@ static void dfd_eye(int32_t cx, int32_t cy, int32_t r, int32_t open, int32_t lx,
         dfd_line(cx - W * 2 / 3, cy - H - 2, cx + W * 2 / 3, cy - H - 2, 1, faint);
     }
 }
-/* SMEAR (dfd6): the eye as light through a broken screen. A pass over the canvas pixels the eye just drew (its box):
- * each pixel's distance from the background is kept as its weight, its colour the split: ember on the left, white-hot
- * in the middle, cold blue on the right (drifting a little); then columns of pixels dragged down (a pixel sort) and a
- * row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
-static const uint8_t HOLO_RGB[8][3] = {{255, 58, 20}, {255, 79, 46}, {255, 138, 102}, {255, 244, 230},
-                                       {127, 224, 255}, {34, 176, 255}, {42, 95, 214}, {42, 95, 214}};
-static uint16_t dfd_hue(uint32_t h)                 /* h: 0..1791 left (ember) .. middle (white-hot) .. right (cold) */
-{
-    uint32_t i = h >= 1792u ? 6u : h >> 8, f = h >= 1792u ? 255u : h & 255u;
-    const uint8_t *a = HOLO_RGB[i], *b = HOLO_RGB[i + 1u];
-    return RGB((a[0] * (256u - f) + b[0] * f) >> 8, (a[1] * (256u - f) + b[1] * f) >> 8, (a[2] * (256u - f) + b[2] * f) >> 8);
-}
+/* SMEAR (dfd6; dfd8: in the eye's original colours): a pass over the canvas pixels the eye just drew (its box):
+ * columns of pixels dragged down (a pixel sort) and a row or two torn sideways (more on a summon, a roll, a furious mood, a loud part). Integer maths, bounded loops */
 static int dfd_grey(uint16_t c)
 {
     int32_t r = ((c >> 11) & 31) * 2, g = (c >> 5) & 63, b = (c & 31) * 2;
@@ -917,7 +907,7 @@ static int dfd_grey(uint16_t c)
 static int32_t dfd_lum(uint16_t c) { return ((c >> 11) & 31) * 2 + ((c >> 5) & 63) + (c & 31) * 2; }   /* 0..187 */
 static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
 {
-    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x, y;
+    int32_t x0 = cx - r * 3 / 2, x1 = cx + r * 3 / 2, y0 = cy - r * 5 / 4 + cv_oy, y1 = cy + r * 5 / 4 + cv_oy, x;
     int32_t lb = dfd_lum(cv_bg), sp = r > 0 ? 1536 / r : 64, drift = DFD_S(fm1_ms / 40u) * 90 / 16384;
     uint32_t t = fm1_ms / 6u, z = (fm1_ms / 50u) * 2654435761u;
     if (ux.mono || (ux.pal[0] == 0x0000u && ux.pal[2] == 0xFFFFu) || (dfd_grey(ux.text) && dfd_grey(ux.theme)))   /* GREY, MONO: no colour */
@@ -928,18 +918,7 @@ static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
     if (y1 > (int32_t)cv_h) y1 = (int32_t)cv_h;
     if (x1 - x0 < 2 || y1 - y0 < 2)
         return;
-    for (y = y0; y < y1; y++) {
-        uint16_t *row = &cv_px[(uint32_t)y * cv_w];
-        for (x = x0; x < x1; x++) {
-            uint16_t c = swap16(row[x]);
-            int32_t w = dfd_lum(c) - lb;
-            if (c == cv_bg)
-                continue;
-            w = (w < 0 ? -w : w) * 256 / 120;
-            if (w > 256) w = 256;
-            row[x] = swap16(ux_mix(cv_bg, dfd_hue((uint32_t)clamp(896 + (x - cx) * sp * 2 / 3 + drift, 0, 1791)), w * 100 / 256));
-        }
-    }
+    (void)lb; (void)sp; (void)drift; (void)t;           /* (the original colours: no recolouring, the drips and tears only) */
     {                                                /* the drips: a column's pixel dragged down, fading */
         uint32_t k, n = 2u + (uint32_t)tear / 12u, q = (fm1_ms / 70u) * 2246822519u + 1u;
         for (k = 0; k < n; k++) {
@@ -970,7 +949,7 @@ static void dfd_holo(int32_t cx, int32_t cy, int32_t r, int32_t tear)
         }
         if ((z >> 5) & 1u) {                         /* a bar of foil */
             int32_t bw = r / 2 + (int32_t)((z >> 11) % (uint32_t)(r + 1)), by = cy - r + (int32_t)((z >> 19) % (uint32_t)(2 * r + 1));
-            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, dfd_hue(t % 1792u));
+            cv_rect(cx - r * 3 / 2 + (int32_t)((z >> 7) % (uint32_t)(3 * r - bw + 1)), by, bw, 1 + (int32_t)((z >> 23) & 1u) * 2, (z >> 9) & 1u ? T_TEXT : T_REC);
         }
     }
 }

@@ -1396,7 +1396,7 @@ static void draw_splash(void)
  * main.c draws it frame by frame for DFD_SPLASH_MS: dots, the ring, the triangle, the tendrils grow, the eye
  * opens, the title is typed and the music line fades in. Canvas only (two bands: 240 x 124 and 240 x 110),
  * integer maths, bounded loops. Not with MENU > ANIM OFF or after a crash (main.c). */
-#define DFD_SPLASH_MS 4400u
+#define DFD_SPLASH_MS 6600u   /* dfd6: + the "buy me a coffee" card (drophlex@gmail.com, PayPal) at the end */
 static const int16_t DFD_SIN[256] = {0,402,804,1205,1606,2006,2404,2801,3196,3590,3981,4370,4756,5139,5520,5897,6270,6639,7005,7366,7723,8076,8423,8765,9102,9434,9760,10080,10394,10702,11003,11297,11585,11866,12140,12406,12665,12916,13160,13395,13623,13842,14053,14256,14449,14635,14811,14978,15137,15286,15426,15557,15679,15791,15893,15986,16069,16143,16207,16261,16305,16340,16364,16379,16384,16379,16364,16340,16305,16261,16207,16143,16069,15986,15893,15791,15679,15557,15426,15286,15137,14978,14811,14635,14449,14256,14053,13842,13623,13395,13160,12916,12665,12406,12140,11866,11585,11297,11003,10702,10394,10080,9760,9434,9102,8765,8423,8076,7723,7366,7005,6639,6270,5897,5520,5139,4756,4370,3981,3590,3196,2801,2404,2006,1606,1205,804,402,0,-402,-804,-1205,-1606,-2006,-2404,-2801,-3196,-3590,-3981,-4370,-4756,-5139,-5520,-5897,-6270,-6639,-7005,-7366,-7723,-8076,-8423,-8765,-9102,-9434,-9760,-10080,-10394,-10702,-11003,-11297,-11585,-11866,-12140,-12406,-12665,-12916,-13160,-13395,-13623,-13842,-14053,-14256,-14449,-14635,-14811,-14978,-15137,-15286,-15426,-15557,-15679,-15791,-15893,-15986,-16069,-16143,-16207,-16261,-16305,-16340,-16364,-16379,-16384,-16379,-16364,-16340,-16305,-16261,-16207,-16143,-16069,-15986,-15893,-15791,-15679,-15557,-15426,-15286,-15137,-14978,-14811,-14635,-14449,-14256,-14053,-13842,-13623,-13395,-13160,-12916,-12665,-12406,-12140,-11866,-11585,-11297,-11003,-10702,-10394,-10080,-9760,-9434,-9102,-8765,-8423,-8076,-7723,-7366,-7005,-6639,-6270,-5897,-5520,-5139,-4756,-4370,-3981,-3590,-3196,-2801,-2404,-2006,-1606,-1205,-804,-402};
 #define DFD_S(a) ((int32_t)DFD_SIN[(uint32_t)(a) & 255u])
 #define DFD_C(a) ((int32_t)DFD_SIN[((uint32_t)(a) + 64u) & 255u])
@@ -1545,13 +1545,27 @@ static __attribute__((unused)) void draw_splash_frame(uint32_t tms)
         dfd_text_c(66, &AF_S, "SEARCH IT ON SPOTIFY, YOUTUBE", c, bg);
         dfd_text_c(80, &AF_S, "AND EVERY AUDIO PLATFORM", c, bg);
     }
-    if (t >= 3500) {                                  /* who made it */
+    if (t >= 3500 && t < 4900) {                      /* who made it */
         uint16_t c = t > 3700 ? bone : faint;
         cv_rect(40, 43, 160, 1, faint);
         dfd_text_c(48, &AF_S, "CREATED AT POLARIS SOUND LAB", c, bg);
         dfd_text_c(63, &AF_S, "MERIDA, YUCATAN, MEXICO", t > 3700 ? ux_mix(T_BG, T_TEXT, 70) : faint, bg);
         dfd_text_c(80, &AF_S, "INSTAGRAM @polaris.sound.lab", t > 3700 ? red : faint, bg);
         dfd_text_c(95, &AF_S, "YOUTUBE @PolarisSoundLab", t > 3700 ? red : faint, bg);
+    }
+    if (t >= 4900) {                                  /* dfd6: if you like it, buy me a coffee (only here, at boot) */
+        uint16_t c = t > 5100 ? bone : faint, sub = t > 5100 ? ux_mix(T_BG, T_TEXT, 70) : faint;
+        int32_t bw = text_w(&AF_S, "Pay") + text_w(&AF_S, "Pal") + 12, ew = text_w(&AF_S, "drophlex@gmail.com"), x0 = (240 - bw - 8 - ew) / 2;
+        cv_rect(40, 43, 160, 1, faint);
+        dfd_text_c(48, &AF_S, "IF YOU LIKE IT, BUY ME A COFFEE", c, bg);
+        dfd_text_c(63, &AF_S, "SI TE GUSTA, INVITAME UN CAFE", sub, bg);
+        if (t > 5100) {                               /* the PayPal mark: a white tag, Pay in navy, Pal in sky blue */
+            uint16_t white = RGB(255, 255, 255), navy = RGB(0, 48, 135), sky = RGB(0, 156, 222);
+            cv_rrect(x0, 78, bw, 17, 4, white, bg);
+            cv_text_on(x0 + 6, 80, &AF_S, "Pay", navy, white);
+            cv_text_on(x0 + 6 + text_w(&AF_S, "Pay"), 80, &AF_S, "Pal", sky, white);
+            cv_text_on(x0 + bw + 8, 80, &AF_S, "drophlex@gmail.com", red, bg);
+        }
     }
     cv_blit(0, 130);
     lcd_sync();

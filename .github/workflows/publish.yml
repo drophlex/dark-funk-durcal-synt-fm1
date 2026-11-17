@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: "release v1.8.2-dfd7 (the .fwsc and the installer)"
+      - name: "release v1.8.2-dfd8 (the .fwsc and the installer)"
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          T=v1.8.2-dfd7
+          T=v1.8.2-dfd8
           gh release view $T >/dev/null 2>&1 || gh release create $T --target main --latest \
-            --title "Dark Funk Durcal Synt 1.8.2-dfd7 (v2) + free plugin" \
+            --title "Dark Funk Durcal Synt 1.8.2-dfd8 (v2) + free plugin" \
             --notes "Firmware for the M-VAVE FM-1, identity FM-1_946. Easiest: open DarkFunkDurcal-Installer.html in Chrome or Edge with the FM-1 on USB and press Install. Manuals (EN+ES): manual/. Web groovebox: https://drophlex.github.io/dark-funk-durcal-synt-fm1/ · Created at Polaris Sound Lab, Mérida, Yucatán, México."
-          gh release upload $T install/DarkFunkDurcal-1.8.2-dfd7.fwsc install/DarkFunkDurcal-Installer.html manual/DarkFunkDurcal-Manual-EN-ES.pdf manual/DarkFunkDurcal-Manual-ES.pdf --clobber
+          gh release upload $T install/DarkFunkDurcal-1.8.2-dfd8.fwsc install/DarkFunkDurcal-Installer.html manual/DarkFunkDurcal-Manual-EN-ES.pdf manual/DarkFunkDurcal-Manual-ES.pdf --clobber
           for z in plugin/*.zip; do [ -f "$z" ] && gh release upload $T "$z" --clobber; done

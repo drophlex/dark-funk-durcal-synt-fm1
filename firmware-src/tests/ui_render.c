@@ -2276,7 +2276,7 @@ int main(int argc, char **argv)
     uint32_t p, s;
     static const char *const SHOW[] = {"GREY", "MONO", "GREEN", "PAPER", "NIGHT", "DURCAL"};   /* (DURCAL: the manual's pictures) */   /* (NIGHT: #50, to review) */
     if (getenv("DFD_SPLASH")) {                      /* Dark Funk Durcal: the boot animation's frames, OUT/ppm/DURCAL_splash_<ms> */
-        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600};
+        static const uint32_t T[] = {600, 1300, 1700, 2100, 2700, 3200, 3800, 4600, 5600, 6400};
         char nm[32];
         state();
         pal(UI_DURCAL_INDEX);
