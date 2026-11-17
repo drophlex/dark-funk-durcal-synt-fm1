@@ -1,68 +1,135 @@
-<p align="center"><img src="docs/images/eye_smear_web.png" width="640" alt="Dark Funk Durcal Synt: the SMEAR eye"></p>
+<p align="center"><a href="https://drophlex.github.io/dark-funk-durcal-synt-fm1/"><img src="docs/images/hero.gif" width="640" alt="Dark Funk Durcal Synt"></a></p>
 
-<h1 align="center">DARK FUNK DURCAL SYNT · v2</h1>
-<p align="center"><b>Web groovebox · firmware for the M-VAVE FM-1 · plugin for Ableton</b><br>
-Acid · breaks · warped funk · IDM · rituals · melodies without theory · made to play live</p>
-<p align="center">Created at <b>POLARIS SOUND LAB</b><br>
-Mérida, Yucatán, México<br>
-<a href="https://www.instagram.com/polaris.sound.lab/">Instagram @polaris.sound.lab</a> · <a href="https://www.youtube.com/@PolarisSoundLab">YouTube @PolarisSoundLab</a></p>
+<h1 align="center">DARK FUNK DURCAL SYNT</h1>
+<p align="center"><b>Música oscura hecha a tu estado de ánimo · Dark music made to your mood</b><br>
+Acid · breaks · jungle · drum'n'bass · rave · funk deformado · IDM<br>
+<i>Gratis · sin instalar · siempre en tono · para tocar en vivo</i></p>
 
-> **What is Dark Funk Durcal?** A music project. Search it on **Spotify, YouTube and every audio platform** —
-> its music is available on every digital platform.
+<p align="center">
+<a href="https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html"><img src="https://img.shields.io/badge/TOCAR%20AHORA-EN%20EL%20NAVEGADOR-ff4a1c?style=for-the-badge" alt="Tocar ahora"></a>
+<a href="https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html"><img src="https://img.shields.io/badge/M--VAVE%20FM--1-INSTALAR%20EN%201%20CLIC-c2412f?style=for-the-badge" alt="Instalar en el FM-1"></a>
+<a href="#-plugin-para-ableton"><img src="https://img.shields.io/badge/ABLETON-AU%20%C2%B7%20VST3%20%C2%B7%20MAC-2fb8ff?style=for-the-badge" alt="Plugin Ableton"></a>
+</p>
+<p align="center">
+<a href="https://drophlex.github.io/dark-funk-durcal-synt-fm1/"><b>🌐 Página oficial</b></a> ·
+<a href="manual/DarkFunkDurcal-Manual-ES.pdf"><b>📘 Manual (ES)</b></a> ·
+<a href="manual/DarkFunkDurcal-Manual-EN-ES.pdf"><b>📗 Manual (EN + ES)</b></a> ·
+<a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest"><b>⬇ Última versión</b></a> ·
+<a href="#english"><b>English</b></a>
+</p>
 
-**English** · [Español](#español)
+---
 
-## ⬇ Get it
+## ✨ Lo que todos buscan
 
-| | Where | What you need |
-|---|---|---|
-| 🌐 **WEB** | **https://drophlex.github.io/dark-funk-durcal-synt-fm1/** · file [`web/DarkFunkDurcalSynt.html`](web/DarkFunkDurcalSynt.html) | Chrome or Edge, on a computer or a phone. Nothing to install. |
-| 🎛 **FM-1** | [Releases](https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases) · [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) (firmware **1.8.2-dfd6** inside) | An M-VAVE FM-1, a USB-C data cable, Chrome or Edge. |
-| 🎹 **VST / AU** | `DarkFunkDurcalSynt-v2-macOS.zip` — ask by DM to [@polaris.sound.lab](https://www.instagram.com/polaris.sound.lab/) | macOS 10.15+, Apple Silicon or Intel, Ableton Live 10–12 (or any AU / VST3 host). KeyLab Essential mk1 / mk2 script included. |
+| | |
+|---|---|
+| ◉ **Una canción con un botón** | Elige dos de 15 estilos, mézclalos y pulsa **SUMMON**: batería, acid, bajo y melodía al mismo tiempo. |
+| ♪ **Siempre en tono** | No necesitas saber música: cada nota encaja con el estado de ánimo (oscuro, acid, funky, melancólico, soñador, alien, rave, hipnótico, soul). |
+| ⚡ **Modo en vivo** | 8 pads: mutes, fill, stutter, build y drop. Escenas que cambian al final del compás, sin cortes. |
+| ✦ **3 ideas para tu melodía** | **NEXT PHRASE**: una respuesta, una variación y una tensión de lo que tocaste. |
+| ⇢ **Tu MIDI a tu DAW** | Exporta `.mid`, arrastra el MIDI del plugin a Ableton o carga cualquier `.mid` al FM-1. |
+| ◬ **Un ojo que siente la música** | Luz cálida y fría, chorreados de pixel y glitch que crecen con el volumen. |
 
-📘 Full illustrated manual with every install step: [English + Español (PDF)](manual/DarkFunkDurcal-Manual-EN-ES.pdf) · [Solo español (PDF)](manual/DarkFunkDurcal-Manual-ES.pdf)
+## ⚡ Guía rápida
 
-## ⚡ Quick guide
+### 🌐 En el navegador (compu o celular)
 
-### 🌐 Web — in 4 taps
-<img src="docs/images/web_v2_live.png" width="420" align="right" alt="The web LIVE tab">
+<img src="docs/images/w_web_v2_live.jpg" width="430" align="right" alt="Pestaña LIVE">
 
-1. Open the link in **Chrome** and tap **◉ AWAKEN** (use headphones: the bass goes deep).
-2. **STYLES** → pick two styles (try *Warped Funk* × *Broken Funk*) → **SUMMON**. A whole song appears, always in key.
-3. **◉ LIVE** → pads **1–4** mute drums / acid / bass / melody, **5** FILL, **6** STUTTER, **7** hold BUILD and let go to DROP,
-   **8** NEXT PHRASE (then try **1 ANSWER · 2 VARIATION · 3 TENSION** and **KEEP**).
-4. Scenes **A–H** change at the end of the bar. Keys **A S D F G H J K** play the melody in key.
-   A KeyLab or any MIDI pad controller works too (pads = notes 36–43, channel 10 or 11).
+1. Abre **[▶ TOCAR AHORA](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html)** y toca **◉ AWAKEN** (con audífonos).
+2. **STYLES** → dos estilos (prueba *Warped Funk* × *Broken Funk*) → **SUMMON FULL TRACK**.
+3. **◉ LIVE** → pads `1`–`4` silencian · `5` fill · `6` stutter · sostén `7` y suelta = **drop** · `8` next phrase.
+4. Teclas `A`…`K` tocan la melodía en tono. **PROJECT** guarda, exporta `.mid` o graba audio.
 
 <br clear="right">
 
-### 🎛 FM-1 — install, then play
-1. USB-C **data** cable straight into the computer, quit MIDI apps, open [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html)
-   in Chrome → **Install** → allow MIDI → don't unplug while it says *Writing*.
-2. Press **HOME** 3 times → **RITUAL** → turn K1/K2 for two styles → **OCT+ SUMMON**.
-3. **HOME** 7 times → **LIVE**: K1 MUTES · K2 REPEAT (stutter) · K3 BUILD (filter rising) · K4 THROW · **OCT+ DROP**.
-4. **HOME** 8 times → **NEXT**: K1 picks ANSWER / VARIATION / TENSION of your phrase, K4 new ideas, **OCT+ KEEP**.
+### 🎛 En el M-VAVE FM-1
 
-<p align="center"><img src="docs/images/fm1_v2.png" width="760" alt="FM-1: RITUAL, LIVE and NEXT with the SMEAR eye"></p>
+1. Cable USB-C **de datos** directo a la compu. Cierra apps MIDI.
+2. Abre el **[instalador](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html)** en Chrome o Edge → **Install** → permite MIDI. *(Siempre puedes regresar al firmware oficial.)*
+3. `HOME` ×3 = **RITUAL** → K1/K2 dos estilos → `OCT+` **SUMMON**.
+4. `HOME` ×7 = **LIVE** (mutes, repeat, build, throw, `OCT+` DROP) · `HOME` ×8 = **NEXT** (3 ideas, `OCT+` KEEP).
 
-### 🎹 Plugin — Ableton + KeyLab Essential
-1. Unzip → right-click **Install.command** → **Open** (copies AU, VST3, the app and the KeyLab script; removes quarantine).
-2. Ableton › Browser › **Plug-Ins** › Polaris Sound Lab › **Dark Funk Durcal Synt** onto a MIDI track. **SUMMON** or pick a preset.
-3. Settings › Link, Tempo & MIDI › Control Surface **DFD_KeyLab_Essential**, In/Out **KeyLab Essential 49 (MIDI)**, Track + Remote ON.
-4. The KeyLab screen shows the knob you move; 8 knobs × 8 banks (PART ‹ ›), faders = levels / filter / echo / reverb / drive,
-   pads = the LIVE pads, keys play in scale, transport = Live's. Drag **DRAG MIDI** into a clip to keep the notes.
+<p align="center"><img src="docs/images/w_fm1_v2.jpg" width="720" alt="FM-1: RITUAL, LIVE y NEXT"></p>
 
-<p align="center"><img src="docs/images/plugin_ui.png" width="760" alt="The plugin"></p>
+### 🎹 Plugin para Ableton
 
-## New in v2
-- **Live mode** everywhere: mutes, fill, stutter, build / drop, scenes switching at the end of the bar.
-- **NEXT PHRASE**: three continuations of *your* melody (answer, variation, tension) that always fit.
-- **New sounds** inspired by 90s IDM, drill'n'bass and warped funk: VOX FORMANT (a talking voice), VELVET EP, MUSIC BOX,
-  RUBBER WAH bass, SLAP bass; styles WARPED FUNK, SLAP DNB, MUSIC BOX IDM, SPECTRAL STEP. No artist names and no
-  copyrighted melodies — every sound and sequence is original.
-- **The SMEAR eye**: warm light on the left, white-hot in the middle, cold on the right, pixel-sort drips and mosaic that
-  grow with the music (web, FM-1 screen and plugin).
-- **The plugin** (AU / VST3 / standalone) with native KeyLab Essential control.
+<img src="docs/images/w_plugin_ui.jpg" width="430" align="right" alt="El plugin">
+
+1. Pídelo por DM a **[@polaris.sound.lab](https://www.instagram.com/polaris.sound.lab/)** → `DarkFunkDurcalSynt-v2-macOS.zip` (Mac Apple Silicon o Intel).
+2. Descomprime → clic derecho en **Install.command** → **Abrir**.
+3. Ableton › Plug-Ins › Polaris Sound Lab › **Dark Funk Durcal Synt** en una pista MIDI. Arrastra **DRAG MIDI** a un clip.
+4. **KeyLab Essential:** Settings › Link, Tempo & MIDI › Control Surface **DFD_KeyLab_Essential**. Pantalla, perillas, faders, pads y teclas listos.
+
+<br clear="right">
+
+## 📸 Fotos de referencia
+
+<p align="center">
+<img src="docs/images/w_web_styles.jpg" width="49%" alt="STYLES">
+<img src="docs/images/w_midi_ritual.jpg" width="49%" alt="MIDI Ritual">
+</p>
+<p align="center"><img src="docs/images/w_web_phone.jpg" width="300" alt="En el celular"><br><i>En el celular: pads grandes para tocar con los dedos.</i></p>
+
+## ⬇ Descargas
+
+| | |
+|---|---|
+| ▶ **Groovebox web** | [Abrir en el navegador](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html) · [archivo .html](web/DarkFunkDurcalSynt.html) (funciona sin internet) |
+| ⬇ **Firmware FM-1 1.8.2-dfd6** | [Abrir el instalador](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcal-1.8.2-dfd6.fwsc) |
+| ⇢ **MIDI Ritual** | [Abrir](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html): carga `.mid` al FM-1 y guarda tus pistas |
+| ♫ **MIDI Pack** | [50 secuencias (.zip)](midi/DarkFunkDurcal-MIDI-Pack.zip): estilos, clásicos y breaks |
+| ◈ **Banco FM** | [DX7 `.syx`](sounds/DarkFunkDurcal_DX7.syx): 32 voces para Dexed o cualquier DX7 |
+| 📘 **Manuales** | [Español](manual/DarkFunkDurcal-Manual-ES.pdf) · [English + Español](manual/DarkFunkDurcal-Manual-EN-ES.pdf): cada paso con imágenes |
+| 🎹 **Plugin (Mac)** | Por DM a [@polaris.sound.lab](https://www.instagram.com/polaris.sound.lab/) |
+
+## ❓ Preguntas frecuentes
+
+<details><summary><b>¿Es gratis?</b></summary>
+
+Sí: la web, el firmware, el pack MIDI y los manuales. El plugin se pide por DM a @polaris.sound.lab.
+</details>
+<details><summary><b>¿Funciona en mi celular o iPhone?</b></summary>
+
+La web suena en cualquier navegador moderno. Lo que usa MIDI (FM-1, instalador, MIDI Ritual) va en Chrome o Edge en una compu; Safari en iPhone no tiene Web MIDI.
+</details>
+<details><summary><b>¿Puedo regresar al firmware oficial del FM-1?</b></summary>
+
+Sí. El instalador primero guarda un respaldo de tu música y tiene la opción de volver al firmware oficial de M-VAVE.
+</details>
+<details><summary><b>¿Puedo publicar lo que haga?</b></summary>
+
+Sí. Sonidos y secuencias son originales (inspirados en el IDM y el funk deformado de los 90, sin nombres de artistas ni melodías con derechos). Lo que hagas es tuyo.
+</details>
+<details><summary><b>¿El plugin funciona en Windows?</b></summary>
+
+Por ahora solo Mac (AU y VST3). En Windows usa la versión web en Chrome o Edge.
+</details>
+
+---
+
+## English
+
+**Dark music made to your mood.** Make a track in 10 seconds and play it live all night: acid, chopped breaks, jungle,
+drum'n'bass, rave, warped funk and IDM — always in key, no music theory needed.
+
+- ▶ **Play now in the browser:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html (computer or phone, nothing to install)
+- ⬇ **M-VAVE FM-1:** open the [installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) in Chrome or Edge with the FM-1 on USB → **Install**
+- 🎹 **Ableton plugin (Mac, AU / VST3, KeyLab Essential script):** DM [@polaris.sound.lab](https://www.instagram.com/polaris.sound.lab/)
+- 📗 **Manual (English + Spanish):** [PDF](manual/DarkFunkDurcal-Manual-EN-ES.pdf) · 🌐 **Website:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/
+
+**Quick guide** — Web: **◉ AWAKEN** → **STYLES** → two styles → **SUMMON** → **◉ LIVE** pads 1–8 (mute, fill, stutter,
+build/drop, next phrase). FM-1: `HOME` ×3 RITUAL → `OCT+` SUMMON · `HOME` ×7 LIVE → `OCT+` DROP · `HOME` ×8 NEXT → `OCT+` KEEP.
+Plugin: Install.command → Ableton › Plug-Ins › Polaris Sound Lab → Control Surface **DFD_KeyLab_Essential**.
+
+---
+
+<p align="center"><b>What is Dark Funk Durcal?</b> Search it on <a href="https://open.spotify.com/search/Dark%20Funk%20Durcal">Spotify</a>, <a href="https://www.youtube.com/results?search_query=Dark+Funk+Durcal">YouTube</a> and every audio platform.<br>
+Created at <b>POLARIS SOUND LAB</b> · Mérida, Yucatán, México<br>
+<a href="https://www.instagram.com/polaris.sound.lab/">Instagram @polaris.sound.lab</a> · <a href="https://www.youtube.com/@PolarisSoundLab">YouTube @PolarisSoundLab</a></p>
+
+<details><summary><b>📂 Detalles técnicos, archivos, compilar el firmware y licencias · Technical details, files, building and licences</b></summary>
 
 ## What it is
 
@@ -183,7 +250,7 @@ sh tests/run_tests.sh               # host tests: UI renders, audio goldens, tap
 
 ---
 
-## Español
+### Español (detalles)
 
 ### ⬇ Descargas
 - 🌐 **WEB:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/ (Chrome o Edge, compu o celular; nada que instalar).
@@ -239,3 +306,5 @@ en cualquier plataforma digital.
 **Creado en Polaris Sound Lab · Mérida, Yucatán, México** ·
 [Instagram @polaris.sound.lab](https://www.instagram.com/polaris.sound.lab/) ·
 [YouTube @PolarisSoundLab](https://www.youtube.com/@PolarisSoundLab)
+
+</details>
