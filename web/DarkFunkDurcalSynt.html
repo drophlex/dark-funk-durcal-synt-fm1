@@ -1599,7 +1599,7 @@ scheduleStep=function(gs,t,d){
 };
 function nextPhrase(){ // three continuations of the melody (track LEAD) that always fit
   const ti=6,tr=P().tracks[ti];if(!LIVE.orig)LIVE.orig=clone(tr);const base=LIVE.orig;
-  const on=base.steps.filter((s,i)=>i<base.len&&s.on);if(!on.length){toast('Make a melody first (MELODY tab)');return}
+  const on=base.steps.filter((s,i)=>i<base.len&&s.on);if(!on.length){toast(t('Make a melody first (MELODY tab)'));return}
   const degs=on.map(s=>degOf(s.n)),mid=Math.round(degs.reduce((a,b)=>a+b,0)/degs.length),L=curScale().length;
   const mk=fn=>{const c=clone(base);c.steps.forEach((s,i)=>{if(i<c.len&&s.on)s.n=fn(s,i,c.len)});
     for(let i=c.len-1;i>=0;i--)if(c.steps[i].on){c.steps[i].n=scaleNote(fn===f3?mid+2:Math.floor(mid/L)*L,0);break}return c};
@@ -1611,30 +1611,31 @@ function keepPhrase(){if(!LIVE.cands)return;LIVE.orig=null;LIVE.cands=null;LIVE.
 function backPhrase(){if(!LIVE.orig)return;P().tracks[6]=clone(LIVE.orig);LIVE.orig=null;LIVE.cands=null;LIVE.pick=-1;renderGrid();renderLive()}
 // the panel
 (function(){
-  const tb=document.querySelector('#tabs button[data-t="orc"]')||document.querySelector('#tabs button:last-child');const b=document.createElement('button');b.dataset.t='live';b.textContent='◉ LIVE';tb.after(b);
+  const tb=document.querySelector('#tabs button[data-t="orc"]')||document.querySelector('#tabs button:last-child');const b=document.createElement('button');b.dataset.t='live';b.dataset.i18n='◉ LIVE';b.textContent=t('◉ LIVE');tb.after(b);
   const p=document.createElement('div');p.className='panel';p.id='p-live';
-  p.innerHTML=`<div class="lbl orn">PERFORM · <span class="hint">pads 1–8 = keys 1–8 · KeyLab / MIDI pads (notes 36–43, ch 10 or 11)</span></div>
+  const I=k=>`<span data-i18n="${k}">${t(k)}</span>`;
+  p.innerHTML=`<div class="lbl orn">${I('PERFORM')} · <span class="hint">${I('pads 1–8 = keys 1–8 · KeyLab / MIDI pads (notes 36–43, ch 10 or 11)')}</span></div>
   <div id="livePads" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 14px"></div>
-  <div class="lbl orn">SCENES · <span class="hint">click = plays from the next bar · the sequence keeps running</span></div>
+  <div class="lbl orn">${I('SCENES')} · <span class="hint">${I('click = plays from the next bar · the sequence keeps running')}</span></div>
   <div class="row c" id="liveScenes" style="gap:6px;flex-wrap:wrap;margin:6px 0 14px"></div>
-  <div class="lbl orn">NEXT PHRASE · <span class="hint">3 continuations of your melody that always fit</span></div>
-  <div class="row c" style="gap:6px;margin:6px 0 14px"><button id="lpGen" class="big">✦ 3 NEXT</button><button id="lp1">1 ANSWER</button><button id="lp2">2 VARIATION</button><button id="lp3">3 TENSION</button><button id="lpKeep">KEEP</button><button id="lpBack">BACK</button></div>
-  <div class="lbl orn">PLAY · <span class="hint">computer keys A S D F G H J K (and Q–I one octave up) play the melody sound, always in key</span></div>
+  <div class="lbl orn">${I('NEXT PHRASE')} · <span class="hint">${I('3 continuations of your melody that always fit')}</span></div>
+  <div class="row c" style="gap:6px;margin:6px 0 14px"><button id="lpGen" class="big" data-i18n="✦ 3 NEXT">${t('✦ 3 NEXT')}</button><button id="lp1" data-i18n="1 ANSWER">${t('1 ANSWER')}</button><button id="lp2" data-i18n="2 VARIATION">${t('2 VARIATION')}</button><button id="lp3" data-i18n="3 TENSION">${t('3 TENSION')}</button><button id="lpKeep" data-i18n="KEEP">${t('KEEP')}</button><button id="lpBack" data-i18n="BACK">${t('BACK')}</button></div>
+  <div class="lbl orn">${I('PLAY')} · <span class="hint">${I('computer keys A S D F G H J K (and Q–I one octave up) play the melody sound, always in key')}</span></div>
   <div class="row c" id="liveKeys" style="gap:4px;margin:6px 0"></div>`;
   (document.getElementById('p-orc')||document.querySelector('.panel:last-of-type')).after(p);
   b.onclick=()=>{UI.tab='live';document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.panel').forEach(q=>q.classList.toggle('show',q.id==='p-live'));renderLive()};
   const pads=p.querySelector('#livePads');
-  PAD_NAMES.forEach((n,k)=>{const e=document.createElement('button');e.className='lpad';e.innerHTML=`<small>PAD ${k+1}</small><br>${n}`;e.style.cssText='min-height:68px;font-size:15px;font-weight:700';
+  PAD_NAMES.forEach((n,k)=>{const e=document.createElement('button');e.className='lpad';e.innerHTML=`<small>PAD ${k+1}</small><br>${t(n)}`;e.style.cssText='min-height:68px;font-size:15px;font-weight:700';
     const on=ev=>{ev.preventDefault();if(!ctx)initAudio();livePad(k,true)},off=()=>{if(LIVE.held[k])livePad(k,false)};
     e.onpointerdown=on;e.onpointerup=e.onpointerleave=e.onpointercancel=off;pads.appendChild(e)});
-  const sc=p.querySelector('#liveScenes');'ABCDEFGH'.split('').forEach((L,j)=>{const e=document.createElement('button');e.textContent=L;e.style.minWidth='44px';e.onclick=()=>{if(playing){queuedPat=j;toast('Next bar: '+L)}else{PRJ.cur=j;renderAll()}renderLive()};sc.appendChild(e)});
+  const sc=p.querySelector('#liveScenes');'ABCDEFGH'.split('').forEach((L,j)=>{const e=document.createElement('button');e.textContent=L;e.style.minWidth='44px';e.onclick=()=>{if(playing){queuedPat=j;toast(t('Next bar: ')+L)}else{PRJ.cur=j;renderAll()}renderLive()};sc.appendChild(e)});
   p.querySelector('#lpGen').onclick=nextPhrase;p.querySelector('#lp1').onclick=()=>pickPhrase(0);p.querySelector('#lp2').onclick=()=>pickPhrase(1);p.querySelector('#lp3').onclick=()=>pickPhrase(2);
   p.querySelector('#lpKeep').onclick=keepPhrase;p.querySelector('#lpBack').onclick=backPhrase;
   const kk=p.querySelector('#liveKeys');'ASDFGHJK'.split('').forEach((c,k)=>{const e=document.createElement('button');e.textContent=c;e.style.minWidth='40px';
     e.onpointerdown=ev=>{ev.preventDefault();liveKey(k,false)};kk.appendChild(e)});
 })();
 function renderLive(){
-  const pads=document.querySelectorAll('#livePads .lpad');pads.forEach((e,k)=>{const lit=k<4?!!PRJ.tr[PAD_TRACKS[k][0]].mute:!!LIVE.held[k]||(k===7&&!!LIVE.cands);e.classList.toggle('on',lit)});
+  const pads=document.querySelectorAll('#livePads .lpad');pads.forEach((e,k)=>{const lb=`<small>PAD ${k+1}</small><br>${t(PAD_NAMES[k])}`;if(e.innerHTML!==lb)e.innerHTML=lb;const lit=k<4?!!PRJ.tr[PAD_TRACKS[k][0]].mute:!!LIVE.held[k]||(k===7&&!!LIVE.cands);e.classList.toggle('on',lit)});
   document.querySelectorAll('#liveScenes button').forEach((e,j)=>{e.classList.toggle('on',PRJ.cur===j);e.style.borderColor=queuedPat===j?'var(--blood)':'';e.style.opacity=patEmpty(PRJ.pats[j])&&PRJ.cur!==j?.55:1});
   ['lp1','lp2','lp3'].forEach((id,k)=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',LIVE.pick===k)});
 }
@@ -1654,6 +1655,22 @@ const _onMidiV1=onMidi;
 onMidi=function(e){const[st,d1,d2]=e.data;const cmd=st&0xF0,ch=st&15;
   if((ch===9||ch===10)&&d1>=36&&d1<=43&&(cmd===0x90||cmd===0x80)){livePad(d1-36,cmd===0x90&&d2>0);return}
   return _onMidiV1(e)};
+
+// ---- Spanish for the v2 parts (English is the default; the ES button switches)
+Object.assign(ES,{'◉ LIVE':'◉ EN VIVO','PERFORM':'TOCAR','pads 1–8 = keys 1–8 · KeyLab / MIDI pads (notes 36–43, ch 10 or 11)':'pads 1–8 = teclas 1–8 · KeyLab / pads MIDI (notas 36–43, canal 10 u 11)',
+ 'SCENES':'ESCENAS','click = plays from the next bar · the sequence keeps running':'clic = suena desde el siguiente compás · la secuencia no se detiene',
+ 'NEXT PHRASE':'SIGUIENTE FRASE','3 continuations of your melody that always fit':'3 continuaciones de tu melodía que siempre encajan',
+ '✦ 3 NEXT':'✦ 3 IDEAS','1 ANSWER':'1 RESPUESTA','2 VARIATION':'2 VARIACIÓN','3 TENSION':'3 TENSIÓN','KEEP':'QUEDAR','BACK':'VOLVER',
+ 'PLAY':'TOCAR','computer keys A S D F G H J K (and Q–I one octave up) play the melody sound, always in key':'las teclas A S D F G H J K (y Q–I una octava arriba) tocan el sonido de la melodía, siempre en tono',
+ 'MUTE DRUMS':'SILENCIA BATERÍA','MUTE ACID':'SILENCIA ACID','MUTE BASS':'SILENCIA BAJO','MUTE LEAD':'SILENCIA MELODÍA','FILL':'FILL','STUTTER':'STUTTER','BUILD / DROP':'SUBIDA / DROP',
+ 'Make a melody first (MELODY tab)':'Primero crea una melodía (pestaña MELODÍA)','Next bar: ':'Siguiente compás: ','3 next phrases: try 1, 2, 3 and KEEP':'3 frases: prueba 1, 2, 3 y QUEDAR','Kept':'Listo',
+ 'If you like it, buy me a coffee':'Si te gusta, invítame un café'});
+applyLang();
+// ---- a small donation link in the corner (never in the way)
+(function(){const a=document.createElement('a');a.href='https://www.paypal.com/donate/?business=drophlex%40gmail.com&currency_code=MXN';a.target='_blank';a.rel='noopener';
+  a.id='donate';a.innerHTML='<span>♥</span> <span data-i18n="If you like it, buy me a coffee">'+t('If you like it, buy me a coffee')+'</span> · PayPal';
+  a.style.cssText='position:fixed;right:10px;bottom:8px;z-index:30;font-size:11px;letter-spacing:.08em;color:var(--dim);text-decoration:none;background:rgba(14,12,11,.75);border:1px solid #2a2420;border-radius:999px;padding:3px 9px;opacity:.7';
+  a.onmouseenter=()=>a.style.opacity=1;a.onmouseleave=()=>a.style.opacity=.7;document.body.appendChild(a)})();
 
 
 // =================== SMEAR: the eye as light through a broken screen (pixel-sort drips, warm/cool split, glow) ===================

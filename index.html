@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dark Funk Durcal Synt · groovebox gratis en tu navegador, el FM-1 y Ableton</title>
+<title>Dark Funk Durcal Synt · free groovebox for your browser, the M-VAVE FM-1 and Ableton</title>
 <meta name="description" content="Música oscura hecha a tu estado de ánimo. Acid, breaks, funk deformado e IDM con un botón, siempre en tono, para tocar en vivo. Gratis en el navegador, firmware para el M-VAVE FM-1 y plugin para Ableton. Polaris Sound Lab, Mérida, Yucatán, México.">
 <meta property="og:title" content="Dark Funk Durcal Synt">
 <meta property="og:description" content="Música oscura hecha a tu estado de ánimo: navegador, M-VAVE FM-1 y Ableton.">
@@ -69,6 +69,7 @@ ol.steps li{counter-increment:s;display:grid;grid-template-columns:46px 1fr;gap:
 ol.steps li::before{content:counter(s);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-weight:700;border:2px solid transparent;background:linear-gradient(var(--ink),var(--ink)) padding-box,linear-gradient(90deg,var(--ember),var(--cold)) border-box}
 ol.steps b{display:block;font-size:20px;letter-spacing:.04em}
 ol.steps span{color:var(--bone2);font-size:17px}
+ol.steps span b{display:inline;font-size:inherit;letter-spacing:inherit;color:var(--bone)}
 kbd{font-family:inherit;font-size:.86em;background:var(--ink3);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;color:var(--bone)}
 .shot{border-radius:12px;border:1px solid var(--line);overflow:hidden;background:#000}
 .shot figcaption{font-size:14px;color:var(--dim);padding:8px 12px;letter-spacing:.06em}
@@ -113,7 +114,7 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
     <a href="#descargas"><span data-es>Descargas</span><span data-en>Downloads</span></a>
     <a href="#faq">FAQ</a>
   </nav>
-  <div class="lang"><button id="bES">ES</button><button id="bEN">EN</button></div>
+  <div class="lang"><button id="bEN">EN</button><button id="bES">ES</button></div>
 </div></div>
 
 <header class="hero"><div class="wrap">
@@ -124,7 +125,7 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
   <div class="cta">
     <a class="btn main" href="web/DarkFunkDurcalSynt.html"><b>▶ <span data-es style="color:inherit;font-size:inherit">TOCAR AHORA</span><span data-en style="color:inherit;font-size:inherit">PLAY NOW</span></b><span data-es>en el navegador · compu o celular</span><span data-en>in the browser · computer or phone</span></a>
     <a class="btn warm" href="install/DarkFunkDurcal-Installer.html"><b>⬇ M-VAVE FM-1</b><span data-es>instalar el firmware en 1 clic</span><span data-en>install the firmware in 1 click</span></a>
-    <a class="btn cold" href="#plugin"><b>🎹 ABLETON · VST</b><span data-es>plugin AU / VST3 para Mac</span><span data-en>AU / VST3 plugin for Mac</span></a>
+    <a class="btn cold" href="plugin.html"><b>🎹 PLUGIN · VST / AU</b><span data-es>Mac y Windows · gratis</span><span data-en>Mac and Windows · free</span></a>
   </div>
 </div></header>
 
@@ -172,12 +173,12 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
 
   <div class="guide" id="g-vst">
     <div><ol class="steps">
-      <li><div><b><span data-es>Pide el plugin</span><span data-en>Get the plugin</span></b><span data-es>Mándanos DM a <a href="https://www.instagram.com/polaris.sound.lab/">@polaris.sound.lab</a>: te llega <i>DarkFunkDurcalSynt-v2-macOS.zip</i> (Mac Apple Silicon o Intel, macOS 10.15+).</span><span data-en>DM <a href="https://www.instagram.com/polaris.sound.lab/">@polaris.sound.lab</a>: you get <i>DarkFunkDurcalSynt-v2-macOS.zip</i> (Apple Silicon or Intel Mac, macOS 10.15+).</span></div></li>
-      <li><div><b><span data-es>Instala</span><span data-en>Install</span></b><span data-es>Descomprime, clic derecho en <kbd>Install.command</kbd> › <kbd>Abrir</kbd>. Copia el AU, el VST3, la app y el script del KeyLab.</span><span data-en>Unzip, right-click <kbd>Install.command</kbd> › <kbd>Open</kbd>. It copies the AU, the VST3, the app and the KeyLab script.</span></div></li>
+      <li><div><b><span data-es>Descárgalo gratis</span><span data-en>Download it free</span></b><span data-es>Desde la <a href="plugin.html">página del plugin</a>: Mac (Apple Silicon o Intel) o Windows 10/11. <b>gratis y de código abierto</b>.</span><span data-en>From the <a href="plugin.html">plugin page</a>: Mac (Apple Silicon or Intel) or Windows 10/11. <b>free and open source</b>.</span></div></li>
+      <li><div><b><span data-es>Instala</span><span data-en>Install</span></b><span data-es>Mac: clic derecho en <kbd>Install.command</kbd> › <kbd>Abrir</kbd>. Windows: doble clic en <kbd>Install.bat</kbd>. Instala el plugin, la app y el script del KeyLab.</span><span data-en>Mac: right-click <kbd>Install.command</kbd> › <kbd>Open</kbd>. Windows: double-click <kbd>Install.bat</kbd>. It installs the plugin, the app and the KeyLab script.</span></div></li>
       <li><div><b><span data-es>En Ableton</span><span data-en>In Ableton</span></b><span data-es>Plug-Ins › Polaris Sound Lab › <b>Dark Funk Durcal Synt</b> en una pista MIDI. SUMMON o un preset. Arrastra <kbd>DRAG MIDI</kbd> a un clip.</span><span data-en>Plug-Ins › Polaris Sound Lab › <b>Dark Funk Durcal Synt</b> onto a MIDI track. SUMMON or a preset. Drag <kbd>DRAG MIDI</kbd> into a clip.</span></div></li>
-      <li><div><b>KeyLab Essential</b><span data-es>Settings › Link, Tempo &amp; MIDI › Control Surface <b>DFD_KeyLab_Essential</b>. La pantalla muestra lo que mueves; pads, faders, perillas y teclas listos.</span><span data-en>Settings › Link, Tempo &amp; MIDI › Control Surface <b>DFD_KeyLab_Essential</b>. The screen shows what you move; pads, faders, knobs and keys ready.</span></div></li>
+      <li><div><b>KeyLab Essential</b><span data-es>Conéctalo y Ableton lo enlaza solo: la pantalla muestra lo que mueves; pads, faders, perillas y teclas listos.</span><span data-en>Plug it in and Ableton links it by itself: the screen shows what you move; pads, faders, knobs and keys ready.</span></div></li>
     </ol>
-    <a class="btn cold gbtn" href="https://www.instagram.com/polaris.sound.lab/"><b>🎹 <span data-es style="color:inherit;font-size:inherit">PEDIR EL PLUGIN</span><span data-en style="color:inherit;font-size:inherit">GET THE PLUGIN</span></b></a></div>
+    <a class="btn cold gbtn" href="plugin.html"><b>🎹 <span data-es style="color:inherit;font-size:inherit">DESCARGAR EL PLUGIN</span><span data-en style="color:inherit;font-size:inherit">DOWNLOAD THE PLUGIN</span></b></a></div>
     <figure class="shot"><img src="docs/images/w_plugin_ui.jpg" alt="The plugin" loading="lazy"><figcaption><span data-es>El plugin en Ableton: RITUAL, el ojo, las 4 pistas, LIVE y 64 perillas.</span><span data-en>The plugin in Ableton: RITUAL, the eye, the 4 tracks, LIVE and 64 knobs.</span></figcaption></figure>
   </div>
 </div></section>
@@ -199,23 +200,24 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
   <p class="sub"><span data-es>Los que dicen “abrir” funcionan directo en el navegador.</span><span data-en>The “open” ones work straight in the browser.</span></p>
   <div class="dl">
     <a href="web/DarkFunkDurcalSynt.html"><span class="i">▶</span><span><b><span data-es>Groovebox web · abrir</span><span data-en>Web groovebox · open</span></b><span data-es>Compu o celular, sin instalar.</span><span data-en>Computer or phone, nothing to install.</span></span></a>
-    <a href="install/DarkFunkDurcal-Installer.html"><span class="i">⬇</span><span><b><span data-es>Instalador FM-1 · abrir</span><span data-en>FM-1 installer · open</span></b><span data-es>Firmware 1.8.2-dfd6, Chrome o Edge.</span><span data-en>Firmware 1.8.2-dfd6, Chrome or Edge.</span></span></a>
+    <a href="install/DarkFunkDurcal-Installer.html"><span class="i">⬇</span><span><b><span data-es>Instalador FM-1 · abrir</span><span data-en>FM-1 installer · open</span></b><span data-es>Firmware 1.8.2-dfd7, Chrome o Edge.</span><span data-en>Firmware 1.8.2-dfd7, Chrome or Edge.</span></span></a>
     <a href="web/DarkFunkDurcal-MIDI-Ritual.html"><span class="i">⇢</span><span><b><span data-es>MIDI Ritual · abrir</span><span data-en>MIDI Ritual · open</span></b><span data-es>.mid al FM-1 y del FM-1 a .mid.</span><span data-en>.mid into the FM-1 and back.</span></span></a>
     <a href="manual/DarkFunkDurcal-Manual-ES.pdf"><span class="i">📘</span><span><b><span data-es>Manual en español (PDF)</span><span data-en>Manual in Spanish (PDF)</span></b><span data-es>Cada paso, con imágenes.</span><span data-en>Every step, with pictures.</span></span></a>
     <a href="manual/DarkFunkDurcal-Manual-EN-ES.pdf"><span class="i">📗</span><span><b><span data-es>Manual inglés + español (PDF)</span><span data-en>Manual English + Spanish (PDF)</span></b><span data-es>58 páginas: web, FM-1 y plugin.</span><span data-en>58 pages: web, FM-1 and plugin.</span></span></a>
     <a href="midi/DarkFunkDurcal-MIDI-Pack.zip"><span class="i">♫</span><span><b>MIDI Pack (.zip)</b><span data-es>50 secuencias: estilos, clásicos y breaks.</span><span data-en>50 sequences: styles, classics and breaks.</span></span></a>
-    <a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcal-1.8.2-dfd6.fwsc"><span class="i">⚙</span><span><b><span data-es>Firmware .fwsc</span><span data-en>Firmware .fwsc</span></b><span data-es>Para usuarios avanzados (identidad FM-1_946).</span><span data-en>For advanced users (identity FM-1_946).</span></span></a>
+    <a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcal-1.8.2-dfd7.fwsc"><span class="i">⚙</span><span><b><span data-es>Firmware .fwsc</span><span data-en>Firmware .fwsc</span></b><span data-es>Para usuarios avanzados (identidad FM-1_946).</span><span data-en>For advanced users (identity FM-1_946).</span></span></a>
+    <a href="plugin.html"><span class="i">🎹</span><span><b><span data-es>Plugin VST3 / AU · Mac y Windows</span><span data-en>VST3 / AU plugin · Mac and Windows</span></b><span data-es>Instalación de un clic · gratis y abierto.</span><span data-en>One-click install · free and open.</span></span></a>
     <a href="sounds/DarkFunkDurcal_DX7.syx"><span class="i">◈</span><span><b><span data-es>Banco FM (DX7 .syx)</span><span data-en>FM bank (DX7 .syx)</span></b><span data-es>32 voces para Dexed o cualquier DX7.</span><span data-en>32 voices for Dexed or any DX7.</span></span></a>
   </div>
 </div></section>
 
 <section id="faq"><div class="wrap" style="max-width:860px">
   <h2>FAQ</h2><br>
-  <details><summary><span data-es>¿Es gratis?</span><span data-en>Is it free?</span></summary><p><span data-es>Sí: la web, el firmware del FM-1, el pack MIDI y los manuales son gratis. El plugin para Ableton se pide por DM a @polaris.sound.lab.</span><span data-en>Yes: the web, the FM-1 firmware, the MIDI pack and the manuals are free. The Ableton plugin is available by DM to @polaris.sound.lab.</span></p></details>
+  <details><summary><span data-es>¿Es gratis?</span><span data-en>Is it free?</span></summary><p><span data-es>Sí: la web, el firmware del FM-1, el pack MIDI y los manuales son gratis. El plugin también es gratis y de código abierto. Si te gusta, puedes invitarme un café por PayPal (drophlex@gmail.com).</span><span data-en>Yes: the web, the FM-1 firmware, the MIDI pack and the manuals are free. The plugin is free and open source too. If you like it, you can buy me a coffee via PayPal (drophlex@gmail.com).</span></p></details>
   <details><summary><span data-es>¿Funciona en mi celular o iPhone?</span><span data-en>Does it work on my phone or iPhone?</span></summary><p><span data-es>Sí, la web suena en cualquier navegador moderno. Lo que necesita MIDI (conectar el FM-1, instalar el firmware, MIDI Ritual) va en Chrome o Edge en una computadora; Safari en iPhone no tiene Web MIDI.</span><span data-en>Yes, the web plays in any modern browser. What needs MIDI (connecting the FM-1, installing the firmware, MIDI Ritual) goes in Chrome or Edge on a computer; Safari on iPhone has no Web MIDI.</span></p></details>
   <details><summary><span data-es>¿Puedo regresar al firmware oficial del FM-1?</span><span data-en>Can I go back to the FM-1’s official firmware?</span></summary><p><span data-es>Sí. El instalador guarda primero un respaldo de tu música y tiene la opción de regresar al firmware oficial de M-VAVE.</span><span data-en>Yes. The installer first saves a backup of your music and has an option to return to the official M-VAVE firmware.</span></p></details>
   <details><summary><span data-es>¿Puedo publicar la música que haga?</span><span data-en>Can I release the music I make?</span></summary><p><span data-es>Sí. Los sonidos y secuencias son originales (inspirados en el IDM y el funk deformado de los 90, sin nombres de artistas ni melodías con derechos). Lo que hagas es tuyo.</span><span data-en>Yes. Sounds and sequences are original (inspired by 90s IDM and warped funk, no artist names or copyrighted melodies). What you make is yours.</span></p></details>
-  <details><summary><span data-es>¿El plugin funciona en Windows?</span><span data-en>Does the plugin run on Windows?</span></summary><p><span data-es>Por ahora solo Mac (AU y VST3). En Windows usa la versión web, que corre en Chrome o Edge.</span><span data-en>Mac only for now (AU and VST3). On Windows use the web version in Chrome or Edge.</span></p></details>
+  <details><summary><span data-es>¿El plugin funciona en Windows?</span><span data-en>Does the plugin run on Windows?</span></summary><p><span data-es>Sí: VST3 y app independiente para Windows 10/11 de 64 bits, además de AU y VST3 para Mac.</span><span data-en>Yes: VST3 and a standalone app for 64-bit Windows 10/11, besides AU and VST3 for Mac.</span></p></details>
   <details><summary><span data-es>¿Qué controladores sirven?</span><span data-en>Which controllers work?</span></summary><p><span data-es>El Arturia KeyLab Essential (mk1/mk2) trae script nativo para Ableton. Cualquier controlador MIDI con pads en las notas 36–43 (canal 10 u 11) toca los pads LIVE de la web y del plugin.</span><span data-en>The Arturia KeyLab Essential (mk1/mk2) has a native Ableton script. Any MIDI controller with pads on notes 36–43 (channel 10 or 11) plays the LIVE pads of the web and the plugin.</span></p></details>
 </div></section>
 
@@ -227,14 +229,16 @@ html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
   <p class="legal"><span data-es>El firmware está basado en Felucca 1.8.2 de Hügelton Instruments (GPL-3.0, sin garantía); el código fuente completo está en el repositorio. M-VAVE y FM-1 son marcas de sus dueños; este firmware no es oficial de M-VAVE.</span><span data-en>The firmware is based on Felucca 1.8.2 by Hügelton Instruments (GPL-3.0, no warranty); the full source code is in the repository. M-VAVE and FM-1 are trademarks of their owners; this firmware is not an official M-VAVE product.</span></p>
 </div></footer>
 
+<a id="donate" href="https://www.paypal.com/donate/?business=drophlex%40gmail.com&currency_code=MXN" target="_blank" rel="noopener" style="position:fixed;right:12px;bottom:10px;z-index:30;font-size:13px;letter-spacing:.06em;color:var(--bone2);text-decoration:none;background:rgba(14,12,11,.85);border:1px solid var(--line);border-radius:999px;padding:5px 12px;opacity:.75">♥ <span data-en>If you like it, buy me a coffee</span><span data-es>Si te gusta, invítame un café</span> · PayPal</a>
 <script>
 (function(){
   const H=document.documentElement;
   function set(l){H.lang=l;document.getElementById('bES').classList.toggle('on',l==='es');document.getElementById('bEN').classList.toggle('on',l==='en');try{localStorage.setItem('dfd_lang',l)}catch(e){}}
-  let l='es';try{l=localStorage.getItem('dfd_lang')||(/^es/i.test(navigator.language||'es')?'es':'en')}catch(e){}
+  let l='en';try{l=localStorage.getItem('dfd_lang')||'en'}catch(e){}
   set(l);
   document.getElementById('bES').onclick=()=>set('es');document.getElementById('bEN').onclick=()=>set('en');
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.guide').forEach(g=>g.classList.toggle('show',g.id===b.dataset.g))});
+  if(location.hash==='#comprar'){location.replace('plugin.html#libre');return}
   if(location.hash==='#plugin'){document.getElementById('plugin').click()}
   document.querySelectorAll('a[href="#plugin"]').forEach(a=>a.addEventListener('click',()=>document.getElementById('plugin').click()));
 })();

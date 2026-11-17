@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dark Funk Durcal Synt · free open-source AU / VST3 plugin for Ableton and any DAW</title>
+<meta name="description" content="Plugin Dark Funk Durcal Synt para Mac y Windows: AU, VST3 y app. Instalación con un doble clic, KeyLab Essential enlazado solo en Ableton. Gratis y de código abierto. Polaris Sound Lab, Mérida, Yucatán, México.">
+<meta property="og:image" content="https://drophlex.github.io/dark-funk-durcal-synt-fm1/docs/images/w_plugin_ui.jpg">
+<meta name="theme-color" content="#0e0c0b">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0e0c0b;--ink2:#171311;--ink3:#211b18;--bone:#ebe2cd;--bone2:#bdb39d;--dim:#857b6a;--line:#3a312b;--ember:#ff4a1c;--rose:#ff6b6b;--cold:#2fb8ff;--blood:#c2412f}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--bone);font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;font-size:19px;line-height:1.45;letter-spacing:.02em;overflow-x:hidden}
+a{color:inherit}
+img,video{max-width:100%;display:block}
+.wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+.split{background:linear-gradient(90deg,var(--ember),#ffd2b8 45%,#fff4e6 50%,#bff3ff 55%,var(--cold));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1,h2,h3{font-family:Cinzel,Georgia,serif;font-weight:700;letter-spacing:.08em;line-height:1.15}
+h2{font-size:clamp(26px,4vw,40px);text-align:center;margin-bottom:10px}
+.kick{font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--bone2);text-align:center;margin-bottom:8px}
+.sub{color:var(--bone2);text-align:center;max-width:720px;margin:0 auto 34px}
+section{padding:70px 0;border-top:1px solid var(--line)}
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:rgba(14,12,11,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:18px;height:56px}
+.brand{font-family:Cinzel,serif;font-weight:700;letter-spacing:.14em;font-size:15px;text-decoration:none;white-space:nowrap}
+.nav{display:flex;gap:16px;margin-left:auto;font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+.nav a{text-decoration:none;color:var(--bone2)}.nav a:hover{color:var(--bone)}
+.lang{display:flex;gap:4px;margin-left:8px}
+.lang button{font:inherit;font-size:13px;background:none;border:1px solid var(--line);color:var(--bone2);border-radius:6px;padding:3px 8px;cursor:pointer}
+.lang button.on{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+@media(max-width:820px){.nav{display:none}.lang{margin-left:auto}}
+/* hero */
+.hero{position:relative;padding:28px 0 60px;text-align:center;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-20% -10% auto;height:120%;background:radial-gradient(ellipse at 30% 30%,rgba(255,74,28,.18),transparent 55%),radial-gradient(ellipse at 70% 30%,rgba(47,184,255,.16),transparent 55%);pointer-events:none}
+.hero video{width:min(760px,100%);margin:0 auto;border-radius:14px;mask-image:radial-gradient(ellipse at center,#000 62%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse at center,#000 62%,transparent 100%)}
+.hero h1{font-size:clamp(30px,6vw,64px);margin-top:-6px}
+.tag{font-size:clamp(18px,2.6vw,24px);letter-spacing:.32em;text-transform:uppercase;margin:10px 0 6px}
+.free{color:var(--bone2);font-size:17px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:26px}
+.cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+.btn{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:230px;padding:14px 22px;border-radius:12px;text-decoration:none;border:1px solid var(--line);background:var(--ink2);transition:transform .15s,box-shadow .15s,border-color .15s}
+.btn b{font-family:Cinzel,serif;font-size:19px;letter-spacing:.1em}
+.btn span{font-size:14px;color:var(--bone2);letter-spacing:.06em}
+.btn:hover{transform:translateY(-2px);border-color:var(--bone2)}
+.btn.main{background:linear-gradient(90deg,#ff4a1c,#ff8a66 40%,#fff4e6 50%,#7fe0ff 60%,#2fb8ff);color:#140f0d;border:none;box-shadow:0 10px 40px rgba(255,120,80,.25),0 10px 40px rgba(47,184,255,.2)}
+.btn.main span{color:#3a2a22}
+.btn.warm{border-color:rgba(255,74,28,.55)}.btn.cold{border-color:rgba(47,184,255,.55)}
+/* features */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.card{background:var(--ink2);border:1px solid var(--line);border-radius:14px;padding:20px 20px 18px;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--ember),#fff4e6,var(--cold));opacity:.8}
+.card .ic{font-size:26px;margin-bottom:6px}
+.card h3{font-size:18px;margin-bottom:6px}
+.card p{color:var(--bone2);font-size:17px}
+/* guide */
+.tabs{display:flex;justify-content:center;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:16px;letter-spacing:.14em;text-transform:uppercase;background:var(--ink2);color:var(--bone2);border:1px solid var(--line);border-radius:10px;padding:9px 18px;cursor:pointer}
+.tabs button.on{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+.guide{display:none;grid-template-columns:1fr 1.15fr;gap:30px;align-items:start}
+.guide.show{display:grid}@media(max-width:860px){.guide.show{grid-template-columns:1fr}}
+ol.steps{list-style:none;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:46px 1fr;gap:12px;margin-bottom:18px}
+ol.steps li::before{content:counter(s);width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-weight:700;border:2px solid transparent;background:linear-gradient(var(--ink),var(--ink)) padding-box,linear-gradient(90deg,var(--ember),var(--cold)) border-box}
+ol.steps b{display:block;font-size:20px;letter-spacing:.04em}
+ol.steps span{color:var(--bone2);font-size:17px}
+ol.steps span b{display:inline;font-size:inherit;letter-spacing:inherit;color:var(--bone)}
+kbd{font-family:inherit;font-size:.86em;background:var(--ink3);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;color:var(--bone)}
+.shot{border-radius:12px;border:1px solid var(--line);overflow:hidden;background:#000}
+.shot figcaption{font-size:14px;color:var(--dim);padding:8px 12px;letter-spacing:.06em}
+.gbtn{margin-top:6px}
+/* gallery */
+.gal{display:grid;grid-template-columns:1.25fr 1fr;gap:16px}
+.gal .tall{grid-row:span 2}
+@media(max-width:760px){.gal{grid-template-columns:1fr}.gal .tall{grid-row:auto}}
+/* downloads */
+.dl{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(max-width:700px){.dl{grid-template-columns:1fr}}
+.dl a{display:flex;gap:14px;align-items:center;text-decoration:none;background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;transition:border-color .15s}
+.dl a:hover{border-color:var(--bone2)}
+.dl .i{font-size:24px;width:34px;text-align:center}
+.dl b{display:block;font-size:19px}
+.dl span{color:var(--bone2);font-size:15px}
+/* faq */
+details{background:var(--ink2);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
+summary{cursor:pointer;font-size:20px;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";float:right;color:var(--bone2)}
+details[open] summary::after{content:"–"}
+details p{color:var(--bone2);margin-top:8px;font-size:17px}
+/* footer */
+footer{border-top:1px solid var(--line);padding:50px 0 60px;text-align:center}
+footer .q{font-family:Cinzel,serif;letter-spacing:.2em;font-size:18px;margin-bottom:8px}
+footer p{color:var(--bone2);font-size:16px}
+.social{display:flex;gap:12px;justify-content:center;margin:18px 0}
+.social a{border:1px solid var(--line);border-radius:999px;padding:8px 16px;text-decoration:none;font-size:16px}
+.legal{font-size:13px!important;color:var(--dim)!important;max-width:760px;margin:16px auto 0}
+[data-en]{display:none}
+html[lang=en] [data-es]{display:none}html[lang=en] [data-en]{display:revert}
+
+.ill{background:var(--ink2);border:1px solid var(--line);border-radius:14px;padding:14px}
+.ill svg{width:100%;height:auto;display:block}
+.ill .cap{color:var(--bone2);font-size:16px;text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap">
+  <a class="brand split" href="./">DARK FUNK DURCAL SYNT</a>
+  <nav class="nav">
+    <a href="./"><span data-es>Inicio</span><span data-en>Home</span></a>
+    <a href="#instalar"><span data-es>Instalar</span><span data-en>Install</span></a>
+    <a href="#libre"><span data-es>Código abierto</span><span data-en>Open source</span></a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <div class="lang"><button id="bEN">EN</button><button id="bES">ES</button></div>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <p class="kick"><span data-es>Plugin para cualquier DAW</span><span data-en>Plugin for any DAW</span></p>
+  <h1 class="split" style="font-size:clamp(28px,5vw,54px)">DARK FUNK DURCAL SYNT</h1>
+  <p class="tag" style="font-size:clamp(15px,2.2vw,20px)">AU · VST3 · <span data-es>APP INDEPENDIENTE</span><span data-en>STANDALONE APP</span></p>
+  <p class="free"><span data-es>Ableton · Logic · FL Studio · Bitwig · Reaper · Cubase · Studio One · GarageBand</span><span data-en>Ableton · Logic · FL Studio · Bitwig · Reaper · Cubase · Studio One · GarageBand</span></p>
+  <figure class="shot" style="max-width:900px;margin:0 auto 26px"><img src="docs/images/w_plugin_ui.jpg" alt="Dark Funk Durcal Synt plugin"></figure>
+  <div class="cta">
+    <a class="btn main" href="plugin/DarkFunkDurcalSynt-v2-macOS.zip" download><b>⌘ MAC</b><span data-es>descargar · Apple Silicon e Intel</span><span data-en>download · Apple Silicon and Intel</span></a>
+    <a class="btn cold" href="plugin/DarkFunkDurcalSynt-v2-Windows.zip" download><b>⊞ WINDOWS</b><span data-es>descargar · Windows 10 / 11, 64 bits</span><span data-en>download · Windows 10 / 11, 64-bit</span></a>
+  </div>
+  <p class="free" style="margin-top:18px"><span data-en>Free and open source · AGPL-3.0</span><span data-es>Gratis y de código abierto · AGPL-3.0</span></p>
+</div></header>
+
+<section id="instalar"><div class="wrap">
+  <p class="kick"><span data-es>Instalación fácil</span><span data-en>Easy install</span></p>
+  <h2><span data-es>Elige tu computadora</span><span data-en>Pick your computer</span></h2>
+  <p class="sub"><span data-es>Un doble clic instala todo: el plugin, la app y el enlace automático del KeyLab para Ableton.</span><span data-en>One double-click installs everything: the plugin, the app and the automatic KeyLab link for Ableton.</span></p>
+  <div class="tabs"><button class="on" data-g="g-mac">⌘ Mac</button><button data-g="g-win">⊞ Windows</button><button data-g="g-key">🎹 KeyLab + Ableton</button><button data-g="g-daw">🎚 <span data-es>Otros DAW</span><span data-en>Other DAWs</span></button></div>
+
+  <div class="guide show" id="g-mac">
+    <div><ol class="steps">
+      <li><div><b><span data-es>Descarga y abre el zip</span><span data-en>Download and open the zip</span></b><span data-es>Pulsa <a href="plugin/DarkFunkDurcalSynt-v2-macOS.zip">MAC</a>. En Descargas, doble clic al zip: aparece la carpeta <i>Dark Funk Durcal Synt v2 (macOS)</i>.</span><span data-en>Press <a href="plugin/DarkFunkDurcalSynt-v2-macOS.zip">MAC</a>. In Downloads, double-click the zip: the folder <i>Dark Funk Durcal Synt v2 (macOS)</i> appears.</span></div></li>
+      <li><div><b><span data-es>Clic derecho › Abrir</span><span data-en>Right-click › Open</span></b><span data-es>Clic derecho (o Control + clic) en <kbd>Install.command</kbd> › <kbd>Abrir</kbd> › <kbd>Abrir</kbd>. Solo la primera vez macOS pregunta.</span><span data-en>Right-click (or Control-click) <kbd>Install.command</kbd> › <kbd>Open</kbd> › <kbd>Open</kbd>. macOS only asks the first time.</span></div></li>
+      <li><div><b><span data-es>Listo</span><span data-en>Done</span></b><span data-es>Sale un aviso de <i>Polaris Sound Lab</i>: quedó instalado el AU, el VST3, la app y el script del KeyLab.</span><span data-en>A <i>Polaris Sound Lab</i> notice appears: the AU, the VST3, the app and the KeyLab script are installed.</span></div></li>
+      <li><div><b><span data-es>Abre tu DAW</span><span data-en>Open your DAW</span></b><span data-es>Reinícialo y busca <b>Dark Funk Durcal Synt</b> (Polaris Sound Lab) en los instrumentos. Arrástralo a una pista MIDI y pulsa SUMMON.</span><span data-en>Restart it and find <b>Dark Funk Durcal Synt</b> (Polaris Sound Lab) among the instruments. Drag it onto a MIDI track and press SUMMON.</span></div></li>
+    </ol></div>
+    <div class="ill">
+      <svg viewBox="0 0 420 300" role="img" aria-label="Right-click Install.command, Open">
+        <rect x="10" y="10" width="400" height="280" rx="14" fill="#171311" stroke="#3a312b"/>
+        <circle cx="34" cy="32" r="6" fill="#ff5f57"/><circle cx="54" cy="32" r="6" fill="#febc2e"/><circle cx="74" cy="32" r="6" fill="#28c840"/>
+        <text x="210" y="37" fill="#bdb39d" font-size="14" text-anchor="middle" font-family="Barlow Condensed,sans-serif">Dark Funk Durcal Synt v2 (macOS)</text>
+        <g font-family="Barlow Condensed,sans-serif" font-size="14" fill="#ebe2cd">
+          <rect x="40" y="70" width="64" height="52" rx="8" fill="#2a221e"/><text x="72" y="140" text-anchor="middle">Plugins</text>
+          <rect x="140" y="70" width="64" height="52" rx="8" fill="#2a221e"/><text x="172" y="140" text-anchor="middle">KeyLab…</text>
+          <rect x="40" y="170" width="64" height="52" rx="8" fill="#ff4a1c" opacity=".9"/><text x="72" y="190" text-anchor="middle" fill="#140f0d" font-weight="700">&gt;_</text><text x="72" y="240" text-anchor="middle" font-weight="700">Install.command</text>
+        </g>
+        <g font-family="Barlow Condensed,sans-serif" font-size="15">
+          <rect x="120" y="168" width="190" height="104" rx="9" fill="#f2ede4" stroke="#bbb"/>
+          <rect x="126" y="176" width="178" height="26" rx="5" fill="#2f7bff"/><text x="140" y="194" fill="#fff" font-weight="700">Abrir / Open</text>
+          <text x="140" y="224" fill="#333">Abrir con… / Open With</text><text x="140" y="250" fill="#333">Mover a la papelera</text>
+        </g>
+        <path d="M96 196 L118 188" stroke="#ebe2cd" stroke-width="2"/><circle cx="96" cy="196" r="4" fill="#ebe2cd"/>
+      </svg>
+      <p class="cap"><span data-es>Clic derecho en <b>Install.command</b> y elige <b>Abrir</b>.</span><span data-en>Right-click <b>Install.command</b> and choose <b>Open</b>.</span></p>
+    </div>
+  </div>
+
+  <div class="guide" id="g-win">
+    <div><ol class="steps">
+      <li><div><b><span data-es>Descarga y extrae</span><span data-en>Download and extract</span></b><span data-es>Pulsa <a href="plugin/DarkFunkDurcalSynt-v2-Windows.zip">WINDOWS</a>. Clic derecho al zip › <kbd>Extraer todo</kbd>.</span><span data-en>Press <a href="plugin/DarkFunkDurcalSynt-v2-Windows.zip">WINDOWS</a>. Right-click the zip › <kbd>Extract All</kbd>.</span></div></li>
+      <li><div><b><span data-es>Doble clic en Install.bat</span><span data-en>Double-click Install.bat</span></b><span data-es>Acepta el permiso de administrador (<kbd>Sí</kbd>). Si aparece “Windows protegió tu PC”: <kbd>Más información</kbd> › <kbd>Ejecutar de todas formas</kbd>.</span><span data-en>Accept the administrator prompt (<kbd>Yes</kbd>). If “Windows protected your PC” shows: <kbd>More info</kbd> › <kbd>Run anyway</kbd>.</span></div></li>
+      <li><div><b><span data-es>Listo</span><span data-en>Done</span></b><span data-es>El VST3 queda en <i>C:\Program Files\Common Files\VST3</i> y el script del KeyLab en tu User Library de Ableton.</span><span data-en>The VST3 goes to <i>C:\Program Files\Common Files\VST3</i> and the KeyLab script to your Ableton User Library.</span></div></li>
+      <li><div><b><span data-es>Abre tu DAW</span><span data-en>Open your DAW</span></b><span data-es>Busca <b>Dark Funk Durcal Synt</b> en tus VST3. ¿Sin DAW? Abre <i>Dark Funk Durcal Synt.exe</i>.</span><span data-en>Find <b>Dark Funk Durcal Synt</b> among your VST3s. No DAW? Open <i>Dark Funk Durcal Synt.exe</i>.</span></div></li>
+    </ol></div>
+    <div class="ill">
+      <svg viewBox="0 0 420 300" role="img" aria-label="Run Install.bat as administrator">
+        <rect x="10" y="10" width="400" height="280" rx="10" fill="#171311" stroke="#3a312b"/>
+        <rect x="10" y="10" width="400" height="34" rx="10" fill="#211b18"/><text x="26" y="33" fill="#bdb39d" font-size="14" font-family="Segoe UI,Barlow Condensed,sans-serif">Dark Funk Durcal Synt v2 (Windows)</text>
+        <g font-family="Segoe UI,Barlow Condensed,sans-serif" font-size="14" fill="#ebe2cd">
+          <rect x="34" y="66" width="352" height="30" rx="4" fill="#2a221e"/><text x="48" y="86">📁 Plugins</text>
+          <rect x="34" y="100" width="352" height="30" rx="4" fill="#2a221e"/><text x="48" y="120">📁 KeyLab Essential (Ableton)</text>
+          <rect x="34" y="134" width="352" height="30" rx="4" fill="#2fb8ff" opacity=".9"/><text x="48" y="154" fill="#0e0c0b" font-weight="700">⚙ Install.bat</text>
+          <rect x="34" y="168" width="352" height="30" rx="4" fill="#2a221e"/><text x="48" y="188">🎛 Dark Funk Durcal Synt.exe</text>
+        </g>
+        <g font-family="Segoe UI,Barlow Condensed,sans-serif" font-size="14">
+          <rect x="110" y="208" width="276" height="70" rx="6" fill="#f3f3f3" stroke="#bbb"/>
+          <text x="124" y="232" fill="#222">¿Permitir que esta app haga cambios?</text>
+          <rect x="230" y="244" width="70" height="24" rx="4" fill="#2f7bff"/><text x="265" y="261" fill="#fff" text-anchor="middle" font-weight="700">Sí</text>
+          <rect x="306" y="244" width="70" height="24" rx="4" fill="#ddd"/><text x="341" y="261" fill="#222" text-anchor="middle">No</text>
+        </g>
+      </svg>
+      <p class="cap"><span data-es>Doble clic en <b>Install.bat</b> y pulsa <b>Sí</b>.</span><span data-en>Double-click <b>Install.bat</b> and press <b>Yes</b>.</span></p>
+    </div>
+  </div>
+
+  <div class="guide" id="g-key">
+    <div><ol class="steps">
+      <li><div><b><span data-es>Instala (Mac o Windows)</span><span data-en>Install (Mac or Windows)</span></b><span data-es>El instalador ya copió el script <b>DFD_KeyLab_Essential</b> a Ableton. No tienes que hacer nada más.</span><span data-en>The installer already copied the <b>DFD_KeyLab_Essential</b> script into Ableton. Nothing else to do.</span></div></li>
+      <li><div><b><span data-es>Conecta el KeyLab y abre Live</span><span data-en>Plug the KeyLab in and open Live</span></b><span data-es>Ableton lo reconoce y lo enlaza solo: la pantalla del KeyLab muestra <b>DARK FUNK DURCAL</b>.</span><span data-en>Ableton recognizes it and links it by itself: the KeyLab screen shows <b>DARK FUNK DURCAL</b>.</span></div></li>
+      <li><div><b><span data-es>Pon el plugin en una pista</span><span data-en>Put the plugin on a track</span></b><span data-es>Selecciónalo: perillas, faders, pads, teclas y transporte ya controlan el plugin. La pantalla muestra lo que mueves.</span><span data-en>Select it: knobs, faders, pads, keys and transport already control the plugin. The screen shows what you move.</span></div></li>
+      <li><div><b><span data-es>¿No se enlazó?</span><span data-en>Not linked?</span></b><span data-es>Solo una vez: Settings › Link, Tempo &amp; MIDI › Control Surface <kbd>DFD_KeyLab_Essential</kbd>, Input/Output <kbd>KeyLab Essential</kbd>.</span><span data-en>Just once: Settings › Link, Tempo &amp; MIDI › Control Surface <kbd>DFD_KeyLab_Essential</kbd>, Input/Output <kbd>KeyLab Essential</kbd>.</span></div></li>
+    </ol></div>
+    <div class="ill">
+      <svg viewBox="0 0 420 300" role="img" aria-label="KeyLab Essential 49 controls">
+        <rect x="10" y="40" width="400" height="220" rx="16" fill="#e9e4da" stroke="#bbb"/>
+        <rect x="24" y="56" width="120" height="40" rx="5" fill="#0e0c0b"/><text x="32" y="72" fill="#7fe0ff" font-size="12" font-family="monospace">DARK FUNK DURCAL</text><text x="32" y="88" fill="#7fe0ff" font-size="12" font-family="monospace">ACID CUTOFF  64%</text>
+        <g fill="#2b2b2b">
+          <circle cx="170" cy="66" r="11"/><circle cx="200" cy="66" r="11"/><circle cx="230" cy="66" r="11"/><circle cx="260" cy="66" r="11"/>
+          <circle cx="170" cy="96" r="11"/><circle cx="200" cy="96" r="11"/><circle cx="230" cy="96" r="11"/><circle cx="260" cy="96" r="11"/>
+          <rect x="284" y="56" width="8" height="50" rx="3"/><rect x="300" y="56" width="8" height="50" rx="3"/><rect x="316" y="56" width="8" height="50" rx="3"/><rect x="332" y="56" width="8" height="50" rx="3"/>
+          <rect x="348" y="56" width="8" height="50" rx="3"/><rect x="364" y="56" width="8" height="50" rx="3"/><rect x="380" y="56" width="8" height="50" rx="3"/><rect x="396" y="56" width="8" height="50" rx="3"/>
+        </g>
+        <g><rect x="24" y="108" width="26" height="24" rx="4" fill="#ff4a1c"/><rect x="54" y="108" width="26" height="24" rx="4" fill="#ff6b3d"/><rect x="84" y="108" width="26" height="24" rx="4" fill="#ff8a66"/><rect x="114" y="108" width="26" height="24" rx="4" fill="#ffd2b8"/>
+        <rect x="24" y="136" width="26" height="24" rx="4" fill="#bff3ff"/><rect x="54" y="136" width="26" height="24" rx="4" fill="#7fe0ff"/><rect x="84" y="136" width="26" height="24" rx="4" fill="#39c8ff"/><rect x="114" y="136" width="26" height="24" rx="4" fill="#2a5fd6"/></g>
+        <g fill="#fff" stroke="#999">
+          <rect x="24" y="172" width="372" height="76" rx="3"/>
+        </g>
+        <g stroke="#bbb">
+          <path d="M37 172v76M50 172v76M63 172v76M76 172v76M89 172v76M102 172v76M115 172v76M128 172v76M141 172v76M154 172v76M167 172v76M180 172v76M193 172v76M206 172v76M219 172v76M232 172v76M245 172v76M258 172v76M271 172v76M284 172v76M297 172v76M310 172v76M323 172v76M336 172v76M349 172v76M362 172v76M375 172v76M388 172v76"/>
+        </g>
+        <g font-family="Barlow Condensed,sans-serif" font-size="13" fill="#ebe2cd">
+          <text x="24" y="24">PADS = LIVE</text><text x="150" y="24">PERILLAS = SONIDO</text><text x="296" y="24">FADERS = MEZCLA</text>
+          <text x="24" y="284">TECLAS = MELODÍA SIEMPRE EN TONO</text>
+        </g>
+      </svg>
+      <p class="cap"><span data-es>Pads = pads LIVE · perillas = el banco de sonido · faders = niveles y efectos · teclas = melodía en tono.</span><span data-en>Pads = LIVE pads · knobs = the sound bank · faders = levels and effects · keys = melody in key.</span></p>
+    </div>
+  </div>
+
+  <div class="guide" id="g-daw">
+    <div><ol class="steps">
+      <li><div><b>Logic · GarageBand</b><span data-es>Pista de instrumento › Instrumento › AU Instruments › <b>Polaris Sound Lab</b> › Dark Funk Durcal Synt.</span><span data-en>Software instrument track › Instrument › AU Instruments › <b>Polaris Sound Lab</b> › Dark Funk Durcal Synt.</span></div></li>
+      <li><div><b>FL Studio</b><span data-es>Options › Manage plugins › <kbd>Find plugins</kbd>; luego Channel rack › + › Dark Funk Durcal Synt.</span><span data-en>Options › Manage plugins › <kbd>Find plugins</kbd>; then Channel rack › + › Dark Funk Durcal Synt.</span></div></li>
+      <li><div><b>Bitwig · Reaper · Cubase · Studio One</b><span data-es>Vuelve a escanear los VST3 (o reinicia) y búscalo como instrumento.</span><span data-en>Rescan VST3s (or restart) and find it as an instrument.</span></div></li>
+      <li><div><b><span data-es>Cualquier teclado MIDI</span><span data-en>Any MIDI keyboard</span></b><span data-es>Las teclas tocan en tono y los pads en notas 36–43 (canal 10 u 11) son los pads LIVE, en cualquier DAW.</span><span data-en>Keys play in key and pads on notes 36–43 (channel 10 or 11) are the LIVE pads, in any DAW.</span></div></li>
+    </ol></div>
+    <figure class="shot"><img src="docs/images/w_plugin_ui.jpg" alt="The plugin" loading="lazy"><figcaption><span data-es>SUMMON a la izquierda, el ojo y las 4 pistas al centro, LIVE a la derecha.</span><span data-en>SUMMON on the left, the eye and the 4 tracks in the middle, LIVE on the right.</span></figcaption></figure>
+  </div>
+</div></section>
+
+<section id="libre"><div class="wrap">
+  <span id="comprar"></span><span id="desbloquear"></span>
+  <p class="kick"><span data-en>Free and open source</span><span data-es>Gratis y de código abierto</span></p>
+  <h2><span data-en>The whole plugin, free. The code, open.</span><span data-es>El plugin completo, gratis. El código, abierto.</span></h2>
+  <p class="sub"><span data-en>No trial, no limits, no account. The source is on GitHub under the AGPL-3.0: learn from it, change it, share it.</span><span data-es>Sin prueba, sin límites, sin cuenta. El código está en GitHub bajo la AGPL-3.0: apréndelo, cámbialo, compártelo.</span></p>
+  <div class="cta"><a class="btn" href="https://github.com/drophlex/dfd-synth-plugin"><b>&lt;/&gt; <span data-en style="color:inherit;font-size:inherit">SOURCE CODE</span><span data-es style="color:inherit;font-size:inherit">CÓDIGO FUENTE</span></b><span>github.com/drophlex/dfd-synth-plugin</span></a></div>
+  <p class="sub" style="margin-top:22px;font-size:15px"><span data-en>If you like what I do, you can buy me a coffee:</span><span data-es>Si te gusta lo que hago, puedes invitarme un café:</span> <a href="https://www.paypal.com/donate/?business=drophlex%40gmail.com&currency_code=MXN" target="_blank" rel="noopener">♥ PayPal · drophlex@gmail.com</a></p>
+  <figure class="shot" style="max-width:820px;margin:22px auto 0"><img src="docs/images/w_plugin_help.jpg" alt="Help" loading="lazy"><figcaption><span data-en>The <b>?</b> button opens the quick guide; <b>ES</b> switches the plugin to Spanish; <b>♥</b> is the donation, small in its corner.</span><span data-es>El botón <b>?</b> abre la guía rápida; <b>ES</b> cambia el plugin a español; <b>♥</b> es la donación, pequeña en su rincón.</span></figcaption></figure>
+</div></section>
+
+<section id="faq"><div class="wrap" style="max-width:860px">
+  <h2>FAQ</h2><br>
+  <details><summary><span data-es>¿De verdad es gratis?</span><span data-en>Is it really free?</span></summary><p><span data-es>Sí: completo, sin prueba ni códigos, y de código abierto (AGPL-3.0). Si te gusta, puedes invitarme un café por PayPal (drophlex@gmail.com).</span><span data-en>Yes: complete, no trial and no codes, and open source (AGPL-3.0). If you like it, you can buy me a coffee via PayPal (drophlex@gmail.com).</span></p></details>
+  <details><summary><span data-es>¿Cómo lo pongo en español?</span><span data-en>How do I switch it to Spanish?</span></summary><p><span data-es>Viene en inglés: pulsa <b>ES</b> en la esquina de abajo a la derecha del plugin. <b>EN</b> lo regresa al inglés.</span><span data-en>It comes in English: press <b>ES</b> in the plugin’s bottom-right corner for Spanish. <b>EN</b> brings English back.</span></p></details>
+  <details><summary><span data-es>macOS dice que no puede abrirlo</span><span data-en>macOS says it can’t open it</span></summary><p><span data-es>Usa clic derecho › Abrir en Install.command (no doble clic). Si aún no: Ajustes del Sistema › Privacidad y seguridad › “Abrir de todos modos”.</span><span data-en>Use right-click › Open on Install.command (not a double-click). Still not: System Settings › Privacy &amp; Security › “Open Anyway”.</span></p></details>
+  <details><summary><span data-es>No aparece en Ableton</span><span data-en>It doesn’t show in Ableton</span></summary><p><span data-es>Settings › Plug-Ins: activa “Use VST3 Plug-In System Folders” (y en Mac “Use Audio Units v2”) y pulsa Rescan.</span><span data-en>Settings › Plug-Ins: turn on “Use VST3 Plug-In System Folders” (and on Mac “Use Audio Units v2”) and press Rescan.</span></p></details>
+  <details><summary><span data-es>¿Funciona con otro controlador que no sea KeyLab?</span><span data-en>Does it work with a controller other than the KeyLab?</span></summary><p><span data-es>Sí: cualquier teclado MIDI toca en tono, y los pads en notas 36–43 (canal 10 u 11) son los pads LIVE. Las 64 perillas se pueden asignar con el MIDI-learn de tu DAW.</span><span data-en>Yes: any MIDI keyboard plays in key, and pads on notes 36–43 (channel 10 or 11) are the LIVE pads. The 64 knobs can be mapped with your DAW’s MIDI learn.</span></p></details>
+</div></section>
+
+<footer><div class="wrap">
+  <p class="q split">WHAT IS DARK FUNK DURCAL?</p>
+  <p><span data-es>Búscalo en Spotify, YouTube y todas las plataformas de audio.</span><span data-en>Search it on Spotify, YouTube and every audio platform.</span></p>
+  <div class="social"><a href="https://www.instagram.com/polaris.sound.lab/">Instagram @polaris.sound.lab</a><a href="https://www.youtube.com/@PolarisSoundLab">YouTube @PolarisSoundLab</a><a href="./">Dark Funk Durcal Synt</a></div>
+  <p><span data-es>Creado en</span><span data-en>Created at</span> <b>POLARIS SOUND LAB</b> · Mérida, Yucatán, México</p>
+</div></footer>
+<a id="donate" href="https://www.paypal.com/donate/?business=drophlex%40gmail.com&currency_code=MXN" target="_blank" rel="noopener" style="position:fixed;right:12px;bottom:10px;z-index:30;font-size:13px;letter-spacing:.06em;color:var(--bone2);text-decoration:none;background:rgba(14,12,11,.85);border:1px solid var(--line);border-radius:999px;padding:5px 12px;opacity:.75">♥ <span data-en>If you like it, buy me a coffee</span><span data-es>Si te gusta, invítame un café</span> · PayPal</a>
+<script>
+(function(){
+  const H=document.documentElement;
+  function set(l){H.lang=l;document.getElementById('bES').classList.toggle('on',l==='es');document.getElementById('bEN').classList.toggle('on',l==='en');try{localStorage.setItem('dfd_lang',l)}catch(e){}}
+  let l='en';try{l=localStorage.getItem('dfd_lang')||'en'}catch(e){}
+  set(l);
+  document.getElementById('bES').onclick=()=>set('es');document.getElementById('bEN').onclick=()=>set('en');
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.guide').forEach(g=>g.classList.toggle('show',g.id===b.dataset.g))});
+  if(/win/i.test(navigator.platform||'')&&!/mac/i.test(navigator.platform||'')){const w=document.querySelector('[data-g="g-win"]');if(w)w.click()}
+})();
+</script>
+</body>
+</html>
