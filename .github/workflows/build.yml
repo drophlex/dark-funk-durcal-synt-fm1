@@ -1,0 +1,69 @@
+name: Build Dark Funk Durcal Synt for the FM-1
+on:
+  push:
+    branches: [main]
+    paths: ['firmware-src/**', 'tools/make_installer.py', '.github/workflows/build.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: build, cancel-in-progress: false }
+env:
+  VERSION: 1.8.2-dfd10
+  IDENTITY: FM-1_904
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Tools (Pillow, fontTools; the JieLi toolchain)
+        run: |
+          pip install Pillow fonttools
+          sh firmware-src/tools/get_toolchain.sh "$HOME/.jieli"
+      - name: Three files of the JieLi AC79 SDK (Apache-2.0)
+        run: |
+          set -e
+          for url in https://github.com/Jieli-Tech/fw-AC79_AIoT_SDK.git https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git; do
+            rm -rf "$HOME/sdk"
+            if git clone --depth 1 --filter=blob:none --sparse --branch AC79NN_SDK_V1.2.1_2023-12-13 "$url" "$HOME/sdk"; then
+              git -C "$HOME/sdk" sparse-checkout set cpu/wl82/tools && break
+            fi
+          done
+          ls -la "$HOME/sdk/cpu/wl82/tools/uboot.boot"
+      - name: Build
+        working-directory: firmware-src
+        run: |
+          export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/sdk"
+          ./build.sh --release "$VERSION" --identity "$IDENTITY"
+      - name: Installer and package
+        run: |
+          set -e
+          rm -f install/DarkFunkDurcal-*.fwsc
+          cp "firmware-src/build/felucca-$VERSION.fwsc" "install/DarkFunkDurcal-$VERSION.fwsc"
+          cp "firmware-src/build/felucca-$VERSION.fwsc" DarkFunkDurcal.fwsc
+          python3 tools/make_installer.py DarkFunkDurcal.fwsc "$VERSION" "$IDENTITY" install/DarkFunkDurcal-Installer.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DarkFunkDurcal-${{ env.VERSION }}
+          path: |
+            DarkFunkDurcal.fwsc
+            install/DarkFunkDurcal-Installer.html
+      - name: Keep the installer in the repo (for the web link)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A install
+          git commit -m "Installer Dark Funk Durcal $VERSION ($IDENTITY), built by CI" || exit 0
+          git pull --rebase -q origin main
+          git push
+      - name: Release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -e
+          T=v$VERSION
+          gh release view $T >/dev/null 2>&1 || gh release create $T --target "$(git rev-parse HEAD)" --latest \
+            --title "Dark Funk Durcal Synt $VERSION for the M-VAVE FM-1 + free plugin" \
+            --notes "Firmware for the M-VAVE FM-1, identity $IDENTITY. Easiest: open DarkFunkDurcal-Installer.html in Chrome or Edge with the FM-1 on USB and press Install (or install it from The Firmware Hub). Manuals: DarkFunkDurcal-Manual-EN.pdf (English), -EN-ES.pdf, -ES.pdf. The FM-1 screen in English or Spanish: HOME x8 (NEXT), knob K3 LANG. Web groovebox: https://drophlex.github.io/dark-funk-durcal-synt-fm1/ · Created at Polaris Sound Lab, Mérida, Yucatán, México."
+          gh release upload $T DarkFunkDurcal.fwsc install/DarkFunkDurcal-Installer.html manual/DarkFunkDurcal-Manual-EN.pdf manual/DarkFunkDurcal-Manual-EN-ES.pdf manual/DarkFunkDurcal-Manual-ES.pdf --clobber
+          for z in plugin/*.zip; do [ -f "$z" ] && gh release upload $T "$z" --clobber; done

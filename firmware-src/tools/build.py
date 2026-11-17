@@ -390,7 +390,7 @@ def main():
     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string vX.Y")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     ap.add_argument("--identity", metavar="FM-1_9NN", help="the package identity instead of --release's FM-1_9XY "
-                    "(Dark Funk Durcal: its own number, FM-1_946)")
+                    "(Dark Funk Durcal: its own number, FM-1_904)")
     a = ap.parse_args()
     name = "felucca.fwsc"
     if a.release:                   # one digit each: the identity has room for two (X.Y.Z and X.Y.Z.W keep X.Y's)

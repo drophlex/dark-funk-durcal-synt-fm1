@@ -80,7 +80,7 @@ Everything comes **in English**; each one has a button to switch to **Spanish**:
 | | |
 |---|---|
 | ▶ **Web groovebox** | [Open in the browser](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html) · [.html file](web/DarkFunkDurcalSynt.html) (works offline) |
-| ⬇ **FM-1 firmware 1.8.2-dfd9** | [Open the installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](install/DarkFunkDurcal-1.8.2-dfd9.fwsc) |
+| ⬇ **FM-1 firmware 1.8.2-dfd10** | [Open the installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](install/DarkFunkDurcal-1.8.2-dfd10.fwsc) |
 | 🎹 **Plugin (Mac, Windows)** | [Plugin page](https://drophlex.github.io/dark-funk-durcal-synt-fm1/plugin.html) · [source code](https://github.com/drophlex/dfd-synth-plugin) |
 | ⇢ **MIDI Ritual** | [Open](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html): load `.mid` into the FM-1 and save your tracks |
 | ♫ **MIDI Pack** | [50 sequences (.zip)](midi/DarkFunkDurcal-MIDI-Pack.zip): styles, classics and breaks |
@@ -163,7 +163,7 @@ and feature of Felucca stays**; Dark Funk Durcal adds:
 | Path | What it is |
 |---|---|
 | [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) | **The installer.** Open it in Chrome or Edge with the FM-1 on USB and press *Install*. The firmware is inside it. It can also take you back to the official M-VAVE firmware. |
-| [`install/DarkFunkDurcal-1.8.2-dfd9.fwsc`](install/DarkFunkDurcal-1.8.2-dfd9.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_946. |
+| [`install/DarkFunkDurcal-1.8.2-dfd10.fwsc`](install/DarkFunkDurcal-1.8.2-dfd10.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_904. |
 | [`manual/DarkFunkDurcal-Manual-EN-ES.pdf`](manual/DarkFunkDurcal-Manual-EN-ES.pdf) | The full illustrated manual, English then Spanish (58 pages: web, FM-1 and plugin, with every install step). |
 | [`manual/DarkFunkDurcal-Manual-EN.pdf`](manual/DarkFunkDurcal-Manual-EN.pdf) | The manual in English only (29 pages). |
 | [`manual/DarkFunkDurcal-Manual-ES.pdf`](manual/DarkFunkDurcal-Manual-ES.pdf) | The manual in Spanish only (29 pages). |
@@ -229,7 +229,7 @@ classics and classic break *rhythms* programmed from scratch. Any `.mid` you own
 
 ## Identity and The Firmware Hub
 
-The package identity is **FM-1_946**, Dark Funk Durcal's own (it no longer uses Felucca's FM-1_918). The update loader
+The package identity is **FM-1_904**, Dark Funk Durcal's own (it no longer uses Felucca's FM-1_918). The update loader
 inside the package is Felucca's, unchanged, so the FM-1 can always install the next firmware or go back to the official
 one. Both flash chips are supported (JEDEC `0x856014` and `0xB36014`). [`fmhub.json`](fmhub.json) describes the
 firmware for [The Firmware Hub](https://thefirmwarehub.com/); every GitHub release carries the `.fwsc`.
@@ -240,7 +240,7 @@ See [`firmware-src/BUILDING.md`](firmware-src/BUILDING.md) (JieLi toolchain + th
 
 ```sh
 cd firmware-src
-./build.sh --release 1.8.2-dfd9 --identity FM-1_946   # -> build/felucca-1.8.2-dfd9.fwsc
+./build.sh --release 1.8.2-dfd10 --identity FM-1_904   # -> build/felucca-1.8.2-dfd10.fwsc
 sh tests/run_tests.sh               # host tests: UI renders, audio goldens, tape echo, fuzzers
 ```
 
