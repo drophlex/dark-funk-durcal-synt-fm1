@@ -12,7 +12,7 @@ Acid · breaks · jungle · drum'n'bass · rave · warped funk · IDM<br>
 </p>
 <p align="center">
 <a href="https://drophlex.github.io/dark-funk-durcal-synt-fm1/"><b>🌐 Website</b></a> ·
-<a href="manual/DarkFunkDurcal-Manual-EN-ES.pdf"><b>📗 Manual (English + Español)</b></a> ·
+<a href="manual/DarkFunkDurcal-Manual-EN.pdf"><b>📗 Manual (English)</b></a> · <a href="manual/DarkFunkDurcal-Manual-EN-ES.pdf"><b>English + Español</b></a> ·
 <a href="https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest"><b>⬇ Latest release</b></a> ·
 <a href="#español"><b>Español</b></a>
 </p>
@@ -85,7 +85,7 @@ Everything comes **in English**; each one has a button to switch to **Spanish**:
 | ⇢ **MIDI Ritual** | [Open](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html): load `.mid` into the FM-1 and save your tracks |
 | ♫ **MIDI Pack** | [50 sequences (.zip)](midi/DarkFunkDurcal-MIDI-Pack.zip): styles, classics and breaks |
 | ◈ **FM bank** | [DX7 `.syx`](sounds/DarkFunkDurcal_DX7.syx): 32 voices for Dexed or any DX7 |
-| 📗 **Manuals** | [English + Español](manual/DarkFunkDurcal-Manual-EN-ES.pdf) · [Español](manual/DarkFunkDurcal-Manual-ES.pdf) |
+| 📗 **Manuals** | [English](manual/DarkFunkDurcal-Manual-EN.pdf) · [English + Español](manual/DarkFunkDurcal-Manual-EN-ES.pdf) · [Español](manual/DarkFunkDurcal-Manual-ES.pdf) |
 
 ## ❓ FAQ
 
@@ -165,6 +165,7 @@ and feature of Felucca stays**; Dark Funk Durcal adds:
 | [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) | **The installer.** Open it in Chrome or Edge with the FM-1 on USB and press *Install*. The firmware is inside it. It can also take you back to the official M-VAVE firmware. |
 | [`install/DarkFunkDurcal-1.8.2-dfd9.fwsc`](install/DarkFunkDurcal-1.8.2-dfd9.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_946. |
 | [`manual/DarkFunkDurcal-Manual-EN-ES.pdf`](manual/DarkFunkDurcal-Manual-EN-ES.pdf) | The full illustrated manual, English then Spanish (58 pages: web, FM-1 and plugin, with every install step). |
+| [`manual/DarkFunkDurcal-Manual-EN.pdf`](manual/DarkFunkDurcal-Manual-EN.pdf) | The manual in English only (29 pages). |
 | [`manual/DarkFunkDurcal-Manual-ES.pdf`](manual/DarkFunkDurcal-Manual-ES.pdf) | The manual in Spanish only (29 pages). |
 | [`web/DarkFunkDurcalSynt.html`](web/DarkFunkDurcalSynt.html) | The web groovebox: 8 channels, styles A × B, dice, melody maker, acid tool, time-stretch, MIDI out / clock, `.mid` export, FM-1 screen preview. Works offline in any modern browser. |
 | [`web/DarkFunkDurcal-MIDI-Ritual.html`](web/DarkFunkDurcal-MIDI-Ritual.html) | MIDI Ritual: load a `.mid` (or one of the 50 built-in) into the FM-1's tracks; save the FM-1's 4 tracks as `.mid`. Chrome / Edge. |
