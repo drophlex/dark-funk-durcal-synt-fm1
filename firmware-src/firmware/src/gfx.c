@@ -8,6 +8,7 @@
  * each glyph is rasterised at 1 << psh horizontal phases (S M 4, L 2: drawn at a pen of +0, +1/4 .. px);
  * cv_text takes the phase that puts it within a phase step of its true place. Blending uses a 16-entry
  * ramp per (ink, background) pair, cached, so a pixel costs a nibble read and a store. Colours come from the theme tokens. */
+#include "lang.c"                                     /* DARK FUNK DURCAL: EN / ES (lang_tr) */
 typedef struct { uint16_t off, adv; int8_t bx; uint8_t by, bw, bh; } aag_t;
 typedef struct {
     uint8_t h, asc, first, last, nex;   /* line height, baseline; ASCII range; extras */
@@ -535,6 +536,7 @@ static int32_t text_w(const aafont_t *f, const char *s)
 {
     int32_t pen = 0;
     uint32_t prev = 0;
+    s = lang_tr(s);
     for (; *s; s++) {
         uint32_t c = fold(f, (uint8_t)*s);
         if (prev)
@@ -550,6 +552,7 @@ static int32_t text_run(int32_t x, int32_t y, const aafont_t *f, const char *s, 
     int32_t pen = 0, err = 0, x0 = 0x7FFF, y0 = 0x7FFF, x1 = -0x7FFF, y1 = -0x7FFF;
     const int32_t step = 16 >> f->psh;
     uint32_t prev = 0;
+    s = lang_tr(s);
     for (; *s; s++) {
         uint32_t c = fold(f, (uint8_t)*s);
         const aag_t *g;
@@ -661,6 +664,7 @@ static int32_t cv_text_in(int32_t x0, int32_t y, int32_t w, const aafont_t *f, c
 static int text_fit(char *d, uint32_t n, const char *s, const aafont_t *f, int32_t maxw)
 {
     uint32_t k = 0;
+    s = lang_tr(s);
     while (s[k] && k + 1u < n) {
         d[k] = s[k];
         k++;

@@ -468,6 +468,8 @@ static uint32_t page_first(uint32_t fam)
 static void ui_say(const char *a, const char *b)
 {
     uint32_t n;
+    a = lang_tr(a);                                    /* DFD: each part in Spanish when LANG is ES */
+    b = lang_tr(b);
     str_cpy(ui.msg, a, sizeof ui.msg);
     n = str_len(ui.msg);
     str_cpy(ui.msg + n, b, sizeof ui.msg - n);
@@ -1633,6 +1635,7 @@ static void settings_later(void)
 }
 static void settings_later_poll(void)                  /* ui_input, every pass */
 {
+    lang_es = (uint8_t)(ui_idle >> 7);                 /* DFD: LANG EN / ES (NEXT page K3; settings ui_idle bit 7) */
     if (set_later.on && (set_later.page != ui.page || set_later.home != ui.home || set_later.layer != ui.layer ||
                          ui.menu || fm1_ms - scrn.idle >= SET_LATER_MS)) {
         set_later.on = 0;

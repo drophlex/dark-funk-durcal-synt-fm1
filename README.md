@@ -18,7 +18,7 @@ Acid · breaks · jungle · drum'n'bass · rave · warped funk · IDM<br>
 </p>
 
 Everything comes **in English**; each one has a button to switch to **Spanish**: the web (**ES**, top right), the plugin
-(**ES**, bottom-right corner), the website (**ES**, top bar) and the manual (English, then Spanish).
+(**ES**, bottom-right corner), the FM-1 (`HOME` ×8 **NEXT** page, knob **K3 LANG**: EN / ES, the whole screen, remembered), the website (**ES**, top bar) and the manual (English, then Spanish).
 
 ---
 
@@ -51,7 +51,7 @@ Everything comes **in English**; each one has a button to switch to **Spanish**:
 1. A USB-C **data** cable straight into the computer. Quit MIDI apps.
 2. Open the **[installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html)** in Chrome or Edge → **Install** → allow MIDI. *(You can always go back to the official firmware.)*
 3. `HOME` ×3 = **RITUAL** → K1/K2 two styles → `OCT+` **SUMMON**.
-4. `HOME` ×7 = **LIVE** (mutes, repeat, build, throw, `OCT+` DROP) · `HOME` ×8 = **NEXT** (3 ideas, `OCT+` KEEP).
+4. `HOME` ×7 = **LIVE** (mutes, repeat, build, throw, `OCT+` DROP) · `HOME` ×8 = **NEXT** (3 ideas, `OCT+` KEEP; **K3 LANG** = EN / ES).
 
 <p align="center"><img src="docs/images/w_fm1_v2.jpg" width="720" alt="FM-1: RITUAL, LIVE and NEXT"></p>
 
@@ -80,7 +80,7 @@ Everything comes **in English**; each one has a button to switch to **Spanish**:
 | | |
 |---|---|
 | ▶ **Web groovebox** | [Open in the browser](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html) · [.html file](web/DarkFunkDurcalSynt.html) (works offline) |
-| ⬇ **FM-1 firmware 1.8.2-dfd8** | [Open the installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](install/DarkFunkDurcal-1.8.2-dfd8.fwsc) |
+| ⬇ **FM-1 firmware 1.8.2-dfd9** | [Open the installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](install/DarkFunkDurcal-1.8.2-dfd9.fwsc) |
 | 🎹 **Plugin (Mac, Windows)** | [Plugin page](https://drophlex.github.io/dark-funk-durcal-synt-fm1/plugin.html) · [source code](https://github.com/drophlex/dfd-synth-plugin) |
 | ⇢ **MIDI Ritual** | [Open](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html): load `.mid` into the FM-1 and save your tracks |
 | ♫ **MIDI Pack** | [50 sequences (.zip)](midi/DarkFunkDurcal-MIDI-Pack.zip): styles, classics and breaks |
@@ -111,7 +111,7 @@ Yes. Sounds and sequences are original (inspired by 90s IDM and warped funk, no 
 ## Español
 
 **Música oscura hecha a tu estado de ánimo.** Todo viene en inglés; el botón **ES** lo pasa a español (la web arriba a
-la derecha, el plugin en su esquina de abajo, la página en la barra de arriba). El manual viene en inglés y en español.
+la derecha, el plugin en su esquina de abajo, el FM-1 en la página NEXT —`HOME` ×8— perilla **K3 IDIOMA**, la página en la barra de arriba). El manual viene en inglés y en español.
 
 - ▶ **Tocar ahora en el navegador:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html (compu o celular, sin instalar nada).
 - ⬇ **M-VAVE FM-1:** abre el [instalador](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) en Chrome o Edge con el FM-1 por USB → **Install**.
@@ -163,7 +163,7 @@ and feature of Felucca stays**; Dark Funk Durcal adds:
 | Path | What it is |
 |---|---|
 | [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) | **The installer.** Open it in Chrome or Edge with the FM-1 on USB and press *Install*. The firmware is inside it. It can also take you back to the official M-VAVE firmware. |
-| [`install/DarkFunkDurcal-1.8.2-dfd8.fwsc`](install/DarkFunkDurcal-1.8.2-dfd8.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_946. |
+| [`install/DarkFunkDurcal-1.8.2-dfd9.fwsc`](install/DarkFunkDurcal-1.8.2-dfd9.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_946. |
 | [`manual/DarkFunkDurcal-Manual-EN-ES.pdf`](manual/DarkFunkDurcal-Manual-EN-ES.pdf) | The full illustrated manual, English then Spanish (58 pages: web, FM-1 and plugin, with every install step). |
 | [`manual/DarkFunkDurcal-Manual-ES.pdf`](manual/DarkFunkDurcal-Manual-ES.pdf) | The manual in Spanish only (29 pages). |
 | [`web/DarkFunkDurcalSynt.html`](web/DarkFunkDurcalSynt.html) | The web groovebox: 8 channels, styles A × B, dice, melody maker, acid tool, time-stretch, MIDI out / clock, `.mid` export, FM-1 screen preview. Works offline in any modern browser. |
@@ -239,7 +239,7 @@ See [`firmware-src/BUILDING.md`](firmware-src/BUILDING.md) (JieLi toolchain + th
 
 ```sh
 cd firmware-src
-./build.sh --release 1.8.2-dfd8 --identity FM-1_946   # -> build/felucca-1.8.2-dfd8.fwsc
+./build.sh --release 1.8.2-dfd9 --identity FM-1_946   # -> build/felucca-1.8.2-dfd9.fwsc
 sh tests/run_tests.sh               # host tests: UI renders, audio goldens, tape echo, fuzzers
 ```
 

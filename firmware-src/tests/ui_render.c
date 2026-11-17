@@ -2391,6 +2391,27 @@ int main(int argc, char **argv)
         if (nruled < 100u) { fprintf(stderr, "ui_render: dividers on %u STYLE screens only\n", nruled); return 1; }
         fprintf(rep, "STYLE LINE (every palette): %u lint findings\n", nfind - n0);
     }
+    {   /* DFD LANG ES (lang.c, NEXT page K3): every screen in Spanish, GREY, linted; OUTDIR/ppm/ES_GREY_<screen>.ppm */
+        uint32_t n0 = nfind;
+        for (p = 0; p < NPALETTES; p++) {
+            if (p != UI_GREY_INDEX) continue;
+            for (s = 0; s < S_COUNT; s++) {
+                char name[64];
+                if (!FELUCCA_FM4 && (s == S_OP_ENV || (s >= S_ALG1 && s <= S_OP_LEVEL)))
+                    continue;
+                snprintf(name, sizeof name, "ES_%s/%s", UI_PALETTES[p].name, S_NAME[s]);
+                cur_name = name;
+                setup((int)s);
+                pal(p);
+                lang_es = 1;
+                draw((int)s);
+                lint();
+                write_ppm(out, "ES_GREY", S_NAME[s]);
+                lang_es = 0;
+            }
+        }
+        fprintf(rep, "LANG ES (GREY): %u lint findings\n", nfind - n0);
+    }
     {   /* MENU > LARGE (ui.c large_kind): every screen in every palette in FLAT and LINE, linted (GREY: gray, MONO:
          * neutral); GREY MONO in FLAT as OUTDIR/ppm/LARGE_<PALETTE>_<screen>.ppm (ui_render.py: sheet_LARGE_<PALETTE>.png),
          * LINE GREY as LARGE-LINE_GREY; the tall cards' value faces counted (lg_hook) */

@@ -741,6 +741,16 @@ static void dfd_knob(uint32_t g, uint32_t slot, int32_t steps)
         if (slot == 3u) lv.thr = (uint8_t)dfd_step(lv.thr, steps > 0 ? 1 : -1, 0, 3);
         dfd_live_apply();
     } else if (g == GR_DFD_NEXT) {
+        if (slot == 2u) {                                /* LANG: the whole screen EN / ES, kept in the settings */
+            uint32_t es = steps > 0 ? 1u : 0u;
+            if (es != lang_es) {
+                lang_es = (uint8_t)es;
+                ui_idle = (uint8_t)(es ? ui_idle | 0x80u : ui_idle & 0x7Fu);
+                settings_later();
+                ui.force = 1;                            /* every word on screen changes: a full redraw */
+            }
+            return;
+        }
         if (chain_busy()) { ui_message("STOP TO EDIT"); return; }
         if (slot == 1u) {
             if (nx.on && nx.pick) { nx.pick = 0; nx_apply(); }
@@ -1065,7 +1075,7 @@ static void dfd_graph(uint32_t g)
         str_cpy(b, "T", sizeof b);
         b[1] = (char)('1' + nx.tgt % NTRK);
         b[2] = 0;
-        str_cpy(b + 2, nx.on ? "  TRYING" : "  READY", 10);
+        str_cpy(b + 2, lang_tr(nx.on ? "  TRYING" : "  READY"), 10);
         cv_text_on(tx, small ? 6 : 14, &AF_M, NX_NAME[nx.pick & 3u], nx.pick ? T_ACCENT : T_TEXT, cv_bg);
         cv_text_on(tx, small ? 26 : 40, &AF_S, b, T_MID, cv_bg);
         if (!small) {                                /* the phrase: its first 16 steps, a dot a note */
@@ -1131,7 +1141,7 @@ static void dfd_columns(uint32_t g)
         static const char *const TN[4] = {"T1", "T2", "T3", "T4"};
         draw_column(0, "PHRASE", NX_COL[nx.pick & 3u], "", VAL(0u), (int32_t)nx.pick * 1000 / 3, ICON_AUTO);
         draw_column(1, "TRACK", TN[nx.tgt % NTRK], "", VAL(1u), (int32_t)(nx.tgt - 1u) * 500, ICON_AUTO);
-        draw_column(2, "-", "", "", VAL(2u), -1, ICON_AUTO);
+        draw_column(2, "LANG", lang_es ? "ES" : "EN", "", VAL(2u), lang_es ? 1000 : 0, ICON_AUTO);
         draw_column(3, "NEW", "TURN", "", VAL(3u), -1, ICON_AUTO);
     } else {
         draw_column(0, "SOURCE", SMP_ALL_NAMES[dfd.src % SMP_NALL], "", VAL(0u), (int32_t)dfd.src * 1000 / (SMP_NALL - 1), ICON_AUTO);

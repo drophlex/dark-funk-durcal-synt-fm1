@@ -2355,6 +2355,8 @@ static int test_soak_cards(void)
     memset(&motion, 0, sizeof motion);                  /* (what it recorded: the tests below start without) */
     memset(motion_active, 0, sizeof motion_active);
     motion_base_valid = motion_full = 0;
+    ui_idle &= 0x7Fu;                                   /* (DFD: a random turn of NEXT K3 may have set LANG ES) */
+    lang_es = 0;
     ui_power_on();
     return check("#63 soak: 150000 random frames, wrapping clocks, motion: no roll lasts, cards = a forced redraw",
                  !old && !stale && cmp >= 500u);
