@@ -5,8 +5,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
-  pages: write
-  id-token: write
 concurrency: { group: publish, cancel-in-progress: false }
 jobs:
   release:
@@ -21,14 +19,3 @@ jobs:
             --title "Dark Funk Durcal Synt 1.8.2-dfd6 (v2: LIVE, NEXT, SMEAR eye)" \
             --notes "Firmware for the M-VAVE FM-1, identity FM-1_946. Easiest: open DarkFunkDurcal-Installer.html in Chrome or Edge with the FM-1 on USB and press Install. Manuals (EN+ES): manual/. Web groovebox: https://drophlex.github.io/dark-funk-durcal-synt-fm1/ · Created at Polaris Sound Lab, Mérida, Yucatán, México."
           gh release upload $T install/DarkFunkDurcal-1.8.2-dfd6.fwsc install/DarkFunkDurcal-Installer.html manual/DarkFunkDurcal-Manual-EN-ES.pdf manual/DarkFunkDurcal-Manual-ES.pdf --clobber
-  pages:
-    runs-on: ubuntu-latest
-    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        with: { enablement: true }
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: . }
-      - id: deploy
-        uses: actions/deploy-pages@v4
