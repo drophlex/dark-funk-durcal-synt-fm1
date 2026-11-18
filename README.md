@@ -79,7 +79,7 @@ Everything comes **in English**; each one has a button to switch to **Spanish**:
 
 | | |
 |---|---|
-| ▶ **Web groovebox** | [Open in the browser](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html) · [.html file](web/DarkFunkDurcalSynt.html) (works offline) |
+| ▶ **Web groovebox** | [Open in the browser](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html) · [.html file](web/DarkFunkDurcalSynt.html) · [offline .zip (latest release)](https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcalSynt-Web.zip) (works offline, computer or phone) |
 | ⬇ **FM-1 firmware 1.8.2-dfd10** | [Open the installer](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) · [`.fwsc`](install/DarkFunkDurcal-1.8.2-dfd10.fwsc) |
 | 🎹 **Plugin (Mac, Windows)** | [Plugin page](https://drophlex.github.io/dark-funk-durcal-synt-fm1/plugin.html) · [source code](https://github.com/drophlex/dfd-synth-plugin) |
 | ⇢ **MIDI Ritual** | [Open](https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcal-MIDI-Ritual.html): load `.mid` into the FM-1 and save your tracks |
@@ -113,7 +113,7 @@ Yes. Sounds and sequences are original (inspired by 90s IDM and warped funk, no 
 **Música oscura hecha a tu estado de ánimo.** Todo viene en inglés; el botón **ES** lo pasa a español (la web arriba a
 la derecha, el plugin en su esquina de abajo, el FM-1 en la página NEXT —`HOME` ×8— perilla **K3 IDIOMA**, la página en la barra de arriba). El manual viene en inglés y en español.
 
-- ▶ **Tocar ahora en el navegador:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html (compu o celular, sin instalar nada).
+- ▶ **Tocar ahora en el navegador:** https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html (compu o celular, sin instalar nada). También viene en el [release](https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest) como `.html` y [`.zip` para usar sin internet](https://github.com/drophlex/dark-funk-durcal-synt-fm1/releases/latest/download/DarkFunkDurcalSynt-Web.zip).
 - ⬇ **M-VAVE FM-1:** abre el [instalador](https://drophlex.github.io/dark-funk-durcal-synt-fm1/install/DarkFunkDurcal-Installer.html) en Chrome o Edge con el FM-1 por USB → **Install**.
 - 🎹 **Plugin (Mac y Windows, cualquier DAW):** [página del plugin](https://drophlex.github.io/dark-funk-durcal-synt-fm1/plugin.html). Mac: clic derecho en **Install.command** › **Abrir**.
   Windows: doble clic en **Install.bat**. El KeyLab Essential se enlaza solo en Ableton.

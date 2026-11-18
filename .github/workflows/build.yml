@@ -2,7 +2,7 @@ name: Build Dark Funk Durcal Synt for the FM-1
 on:
   push:
     branches: [main]
-    paths: ['firmware-src/**', 'tools/make_installer.py', '.github/workflows/build.yml']
+    paths: ['firmware-src/**', 'web/**', 'tools/make_installer.py', '.github/workflows/build.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -64,6 +64,9 @@ jobs:
           T=v$VERSION
           gh release view $T >/dev/null 2>&1 || gh release create $T --target "$(git rev-parse HEAD)" --latest \
             --title "Dark Funk Durcal Synt $VERSION for the M-VAVE FM-1 + free plugin" \
-            --notes "Firmware for the M-VAVE FM-1, identity $IDENTITY. Easiest: open DarkFunkDurcal-Installer.html in Chrome or Edge with the FM-1 on USB and press Install (or install it from The Firmware Hub). Manuals: DarkFunkDurcal-Manual-EN.pdf (English), -EN-ES.pdf, -ES.pdf. The FM-1 screen in English or Spanish: HOME x8 (NEXT), knob K3 LANG. Web groovebox: https://drophlex.github.io/dark-funk-durcal-synt-fm1/ · Created at Polaris Sound Lab, Mérida, Yucatán, México."
+            --notes "Firmware for the M-VAVE FM-1, identity $IDENTITY. Easiest: open DarkFunkDurcal-Installer.html in Chrome or Edge with the FM-1 on USB and press Install (or install it from The Firmware Hub). Manuals: DarkFunkDurcal-Manual-EN.pdf (English), -EN-ES.pdf, -ES.pdf. The FM-1 screen in English or Spanish: HOME x8 (NEXT), knob K3 LANG. Web groovebox (also attached: DarkFunkDurcalSynt.html, DarkFunkDurcal-MIDI-Ritual.html and DarkFunkDurcalSynt-Web.zip, they work offline): https://drophlex.github.io/dark-funk-durcal-synt-fm1/web/DarkFunkDurcalSynt.html · Created at Polaris Sound Lab, Mérida, Yucatán, México."
           gh release upload $T DarkFunkDurcal.fwsc install/DarkFunkDurcal-Installer.html manual/DarkFunkDurcal-Manual-EN.pdf manual/DarkFunkDurcal-Manual-EN-ES.pdf manual/DarkFunkDurcal-Manual-ES.pdf --clobber
           for z in plugin/*.zip; do [ -f "$z" ] && gh release upload $T "$z" --clobber; done
+          # Web version (browser groovebox + MIDI Ritual): loose files and an offline zip
+          (cd web && zip -q -9 ../DarkFunkDurcalSynt-Web.zip DarkFunkDurcalSynt.html DarkFunkDurcal-MIDI-Ritual.html)
+          gh release upload $T web/DarkFunkDurcalSynt.html web/DarkFunkDurcal-MIDI-Ritual.html DarkFunkDurcalSynt-Web.zip --clobber
