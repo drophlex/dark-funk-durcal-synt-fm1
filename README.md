@@ -164,6 +164,7 @@ and feature of Felucca stays**; Dark Funk Durcal adds:
 |---|---|
 | [`install/DarkFunkDurcal-Installer.html`](install/DarkFunkDurcal-Installer.html) | **The installer.** Open it in Chrome or Edge with the FM-1 on USB and press *Install*. The firmware is inside it. It can also take you back to the official M-VAVE firmware. |
 | [`install/DarkFunkDurcal-1.8.2-dfd10.fwsc`](install/DarkFunkDurcal-1.8.2-dfd10.fwsc) | The firmware package itself (for Felucca's tools / advanced users). Identity FM-1_904. |
+| **Manuals per edition** (illustrated, EN · ES · both) | 🎹 Plug-in: [EN](manual/DarkFunkDurcal-Plugin-Manual-EN.pdf) · [ES](manual/DarkFunkDurcal-Plugin-Manual-ES.pdf) · [EN+ES](manual/DarkFunkDurcal-Plugin-Manual-EN-ES.pdf) — 🌐 Web: [EN](manual/DarkFunkDurcal-Web-Manual-EN.pdf) · [ES](manual/DarkFunkDurcal-Web-Manual-ES.pdf) · [EN+ES](manual/DarkFunkDurcal-Web-Manual-EN-ES.pdf) — 📟 FM-1: [EN](manual/DarkFunkDurcal-FM1-Manual-EN.pdf) · [ES](manual/DarkFunkDurcal-FM1-Manual-ES.pdf) · [EN+ES](manual/DarkFunkDurcal-FM1-Manual-EN-ES.pdf) (`tools/manual_editions/build.py`) |
 | [`manual/DarkFunkDurcal-Manual-EN-ES.pdf`](manual/DarkFunkDurcal-Manual-EN-ES.pdf) | The full illustrated manual, English then Spanish (58 pages: web, FM-1 and plugin, with every install step). |
 | [`manual/DarkFunkDurcal-Manual-EN.pdf`](manual/DarkFunkDurcal-Manual-EN.pdf) | The manual in English only (29 pages). |
 | [`manual/DarkFunkDurcal-Manual-ES.pdf`](manual/DarkFunkDurcal-Manual-ES.pdf) | The manual in Spanish only (29 pages). |
